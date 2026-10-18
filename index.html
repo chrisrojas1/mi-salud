@@ -111,7 +111,7 @@ details summary{cursor:pointer;font-weight:600}
 "use strict";
 /* ================= Almacenamiento (solo en este teléfono) ================= */
 const KEY="mi-salud-v1";
-const EMPTY=()=>({app:"mi-salud",version:2,pendientes:"",parametros:{nombre:"",sexo:"",talla:null,nacimiento:"",cuelloRef:null,correccionBalanza:0},medidas:[],balanza:[],laboratorio:[],eventos:[],entrenos:[],ejerciciosPropios:[]});
+const EMPTY=()=>({app:"mi-salud",version:2,pendientes:"",ocultos:[],parametros:{nombre:"",sexo:"",talla:null,nacimiento:"",cuelloRef:null,correccionBalanza:0},medidas:[],balanza:[],laboratorio:[],eventos:[],entrenos:[],ejerciciosPropios:[]});
 let S=EMPTY();
 function migrate(d){const o=Object.assign(EMPTY(),d);o.parametros=Object.assign(EMPTY().parametros,d.parametros||{});const p=o.parametros;if(p.correccionBeurer!=null&&!p.correccionBalanza){p.correccionBalanza=p.correccionBeurer;}delete p.correccionBeurer;if(!p.sexo&&d.app==="salud-christian")p.sexo="M";return o;}
 function load(){try{const t=localStorage.getItem(KEY);if(t){S=migrate(JSON.parse(t));}}catch(e){toast("No se pudieron leer los datos guardados");}}
@@ -179,8 +179,10 @@ const BASE=[
  {id:"plancha",name:"Plancha",group:"Core",kind:"time"},{id:"bici-est",name:"Bicicleta estática",group:"Cardio",kind:"cardio"},
  {id:"bici-ruta",name:"Bicicleta de ruta",group:"Cardio",kind:"bike"},{id:"caminata",name:"Caminata",group:"Cardio",kind:"cardio"}];
 const GROUPS=["Tren superior","Tren inferior","Core","Cardio"];
-const catalog=()=>BASE.concat(S.ejerciciosPropios||[]);
-const findEx=id=>catalog().find(e=>e.id===id);
+const allEx=()=>BASE.concat(S.ejerciciosPropios||[]);
+const catalog=()=>allEx().filter(e=>!(S.ocultos||[]).includes(e.id));
+const findEx=id=>allEx().find(e=>e.id===id);
+let editCat=false;
 const isCardio=k=>k==="cardio"||k==="bike";
 function weekStart(s){const d=pD(s);d.setDate(d.getDate()-((d.getDay()+6)%7));return iso(d);}
 function agg(list){const r={days:new Set(),sets:0,reps:0,ton:0,cmin:0,km:0,elev:0};list.forEach(e=>{r.days.add(e.date);if(e.kind==="reps"){r.sets+=e.sets;r.reps+=e.sets*e.reps;r.ton+=e.sets*e.reps*(e.kg||0);}else if(e.kind==="time"){r.sets+=e.sets;}else{r.cmin+=e.min||0;if(e.exId.startsWith("bici")){r.km+=e.km||0;r.elev+=e.elev||0;}}});return r;}
@@ -255,11 +257,25 @@ function vEntreno(m){
   $("e-date").onchange=e=>{entDate=e.target.value||today();drawDay();};
   drawCat();drawForm();drawDay();drawWeeks();drawProg();
 }
-function drawCat(){const box=$("cat");box.innerHTML="";GROUPS.forEach(g=>{const it=catalog().filter(e=>e.group===g);if(!it.length)return;
+function drawCat(){const box=$("cat");box.innerHTML="";
+  const top=document.createElement("div");top.className="row between";
+  top.innerHTML=`<span class="hint">${editCat?"Toque ✕ para quitar un ejercicio del menú. Sus registros anteriores no se borran.":""}</span><button type="button" class="btn ghost sm" id="cat-edit">${editCat?"Listo":"Editar menú"}</button>`;
+  box.appendChild(top);top.querySelector("#cat-edit").onclick=()=>{editCat=!editCat;drawCat();};
+  GROUPS.forEach(g=>{const it=catalog().filter(e=>e.group===g);if(!it.length&&!(g==="Cardio"&&!editCat))return;
   const d=document.createElement("div");d.innerHTML=`<div class="lbl" style="margin-bottom:5px">${g}</div><div class="chips"></div>`;const ch=d.querySelector(".chips");
-  it.forEach(e=>{const b=document.createElement("button");b.className="chip"+(isCardio(e.kind)?" c":"");b.textContent=e.name;b.setAttribute("aria-pressed",selEx===e.id?"true":"false");b.onclick=()=>{selEx=e.id;drawCat();drawForm();};ch.appendChild(b);});
-  if(g==="Cardio"){const a=document.createElement("button");a.className="chip add";a.textContent="+ Ejercicio";a.onclick=addExercise;ch.appendChild(a);}
-  box.appendChild(d);});}
+  it.forEach(e=>{const b=document.createElement("button");b.className="chip"+(isCardio(e.kind)?" c":"");
+    if(editCat){b.textContent=e.name+"  ✕";b.setAttribute("aria-label","Quitar "+e.name+" del menú");b.style.borderStyle="dashed";
+      b.onclick=()=>{const own=(S.ejerciciosPropios||[]).some(x=>x.id===e.id);const used=S.entrenos.some(x=>x.exId===e.id);
+        if(own&&!used){S.ejerciciosPropios=S.ejerciciosPropios.filter(x=>x.id!==e.id);}else{S.ocultos=(S.ocultos||[]).concat([e.id]);}
+        if(selEx===e.id){selEx=null;drawForm();}save();toast("Quitado del menú: "+e.name);drawCat();};}
+    else{b.textContent=e.name;b.setAttribute("aria-pressed",selEx===e.id?"true":"false");b.onclick=()=>{selEx=e.id;drawCat();drawForm();};}
+    ch.appendChild(b);});
+  if(g==="Cardio"&&!editCat){const a=document.createElement("button");a.className="chip add";a.textContent="+ Ejercicio";a.onclick=addExercise;ch.appendChild(a);}
+  box.appendChild(d);});
+  const hid=allEx().filter(e=>(S.ocultos||[]).includes(e.id));
+  if(editCat&&hid.length){const r=document.createElement("div");r.innerHTML=`<div class="lbl" style="margin-bottom:5px">Ocultos — toque para volver a mostrar</div><div class="chips"></div>`;const ch=r.querySelector(".chips");
+    hid.forEach(e=>{const b=document.createElement("button");b.className="chip add";b.textContent="+ "+e.name;b.onclick=()=>{S.ocultos=S.ocultos.filter(x=>x!==e.id);save();toast("Vuelve al menú: "+e.name);drawCat();};ch.appendChild(b);});box.appendChild(r);}
+}
 function stepper(id,label,val,step,min,dec){return `<div class="field"><label class="lbl" for="${id}">${label}</label><div class="stepper"><button type="button" data-s="${id}" data-d="-${step}" aria-label="Menos">−</button><input type="number" inputmode="decimal" id="${id}" value="${val}" min="${min}" step="${step}" data-dec="${dec||0}"><button type="button" data-s="${id}" data-d="${step}" aria-label="Más">+</button></div></div>`;}
 function lastOf(id){return S.entrenos.filter(e=>e.exId===id).sort((a,b)=>(b.date+b.ts).localeCompare(a.date+a.ts))[0];}
 function drawForm(){const f=$("eform");if(!selEx){f.innerHTML=`<p class="hint">Toque un ejercicio para registrarlo.</p>`;return;}
