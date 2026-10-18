@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f6e63">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Mi Salud</title>
+<style>
+:root{
+  --bg:#f3f4f2;--panel:#fff;--ink:#1d2321;--muted:#5f6a66;--line:#d9ddd9;
+  --accent:#0f6e63;--accent-ink:#fff;--accent-soft:#dcefeb;--warn:#a4421d;--warn-soft:#f8e3da;--chip:#eceeeb;
+  --cardio:#2c5a9e;--cardio-soft:#e1e9f5;--ok:#2f7d32;
+  --display:"Barlow Condensed","Roboto Condensed","Arial Narrow",sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141917;--panel:#1c2220;--ink:#e7ebe9;--muted:#9aa6a1;--line:#2e3633;
+  --accent:#3fb3a3;--accent-ink:#0d1513;--accent-soft:#1f3632;--warn:#e58a63;--warn-soft:#3a2620;--chip:#252c29;
+  --cardio:#7fa8e6;--cardio-soft:#1e2a3b;--ok:#7cc47f;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;
+  padding:env(safe-area-inset-top,0) max(14px,env(safe-area-inset-right,0px)) calc(78px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:14px;padding-top:12px}
+header.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+h1{font-family:var(--display);font-weight:700;font-size:28px;margin:0;letter-spacing:.02em;text-transform:uppercase}
+h2{font-family:var(--display);font-weight:600;font-size:20px;margin:0;letter-spacing:.03em;text-transform:uppercase}
+.sub,.hint{color:var(--muted);font-size:13px}
+.iconbtn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:8px 12px;font:600 14px var(--body);cursor:pointer}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+.lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--chip);color:var(--ink);font:500 14px var(--body);padding:7px 11px;border-radius:999px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip.c[aria-pressed=true]{background:var(--cardio);border-color:var(--cardio)}
+.chip.add{border-style:dashed;background:transparent;color:var(--muted)}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.stepper{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--bg)}
+.stepper button{width:42px;border:0;background:var(--chip);color:var(--ink);font:600 20px var(--body);cursor:pointer}
+.stepper input{flex:1;min-width:0;width:100%;border:0;background:transparent;color:var(--ink);text-align:center;font:600 22px var(--display);padding:6px 0}
+input,select,textarea{border:1px solid var(--line);background:var(--bg);color:var(--ink);font:500 15px var(--body);padding:9px 10px;border-radius:9px;width:100%;min-width:0}
+input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{border:0;background:var(--accent);color:var(--accent-ink);font:600 15px var(--body);padding:11px 16px;border-radius:10px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn.warn{background:var(--warn);color:#fff}
+.btn.sm{font-size:13px;padding:7px 11px}
+.prev{font-size:13px;background:var(--accent-soft);padding:8px 10px;border-radius:8px}
+ul.list{list-style:none;margin:0;padding:0}
+ul.list li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 0;border-top:1px solid var(--line)}
+ul.list li:first-child{border-top:0}
+.big{font-family:var(--display);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.u{font-family:var(--body);font-size:12px;color:var(--muted);font-weight:500}
+.del{border:0;background:transparent;color:var(--muted);font-size:13px;cursor:pointer;padding:6px}
+ul.list li>.del{grid-column:2;grid-row:1/span 2;align-self:center}
+ul.list li>div{grid-column:1}
+.tag{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border-radius:4px;background:var(--accent-soft);color:var(--accent);margin-left:6px;vertical-align:2px}
+.tag.c{background:var(--cardio-soft);color:var(--cardio)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat{background:var(--bg);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--display);font-size:28px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.stat.alert{background:var(--warn-soft)} .stat.alert b{color:var(--warn)}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:6px 7px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--panel)}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+td.hi{color:var(--warn);font-weight:700}
+td.ex{color:var(--muted);text-decoration:line-through}
+.chart svg{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-size:11px;font-family:var(--body)}
+.empty{color:var(--muted);text-align:center;padding:16px 8px;font-size:14px}
+.note{font-size:13px;padding:10px 12px;border-radius:8px;background:var(--cardio-soft)}
+.note.w{background:var(--warn-soft)}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);display:flex;padding:4px max(6px,env(safe-area-inset-right,0px)) calc(4px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px));z-index:5}
+nav.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:600 12px var(--body);padding:8px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border-radius:8px}
+nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+nav.tabs button[aria-selected=true]{color:var(--accent);background:var(--accent-soft)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;z-index:20;max-width:90vw}
+details summary{cursor:pointer;font-weight:600}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div><h1 id="title">Mi Salud</h1><div class="sub" id="subtitle">Entrenamiento, medidas, balanza y laboratorio</div></div>
+    <button class="iconbtn" id="btn-datos" aria-label="Datos y ajustes">Datos</button>
+  </header>
+  <main id="main"></main>
+</div>
+
+<nav class="tabs" aria-label="Secciones">
+  <button data-v="inicio" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</button>
+  <button data-v="entreno"><svg viewBox="0 0 24 24"><path d="M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12"/></svg>Entreno</button>
+  <button data-v="cuerpo"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM8 7v3M12 7v4M16 7v3"/></svg>Medidas</button>
+  <button data-v="balanza"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 10a3 3 0 0 1 6 0M12 10l1.5-2"/></svg>Balanza</button>
+  <button data-v="lab"><svg viewBox="0 0 24 24"><path d="M9 3v6l-5 9a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-5-9V3M8 3h8M7 14h10"/></svg>Análisis</button>
+</nav>
+<div class="toast" id="toast" hidden></div>
+<input type="file" id="file-in" accept=".json,application/json" hidden>
+
+<script>
+"use strict";
+/* ================= Almacenamiento (solo en este teléfono) ================= */
+const KEY="mi-salud-v1";
+const EMPTY=()=>({app:"salud-christian",version:1,parametros:{talla:174,cuelloRef:43,correccionBeurer:1.7,sexo:"M"},medidas:[],balanza:[],laboratorio:[],eventos:[],entrenos:[],ejerciciosPropios:[]});
+let S=EMPTY();
+function load(){try{const t=localStorage.getItem(KEY);if(t){S=Object.assign(EMPTY(),JSON.parse(t));}}catch(e){toast("No se pudieron leer los datos guardados");}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));localStorage.setItem(KEY+"-ts",new Date().toISOString());}catch(e){toast("No se pudo guardar: memoria del navegador llena");}}
+if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(()=>{});}
+
+/* ================= Utilidades ================= */
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,"0");
+const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const today=()=>iso(new Date());
+const pD=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,(m||1)-1,d||1);};
+const num=v=>{const n=parseFloat(String(v??"").replace(",","."));return isFinite(n)?n:null;};
+const fmt=(n,d=0)=>n==null||!isFinite(n)?"—":Number(n).toLocaleString("es-BO",{minimumFractionDigits:d,maximumFractionDigits:d});
+const fD=s=>pD(s).toLocaleDateString("es-BO",{day:"2-digit",month:"short",year:"2-digit"});
+const fDay=s=>pD(s).toLocaleDateString("es-BO",{weekday:"long",day:"numeric",month:"long"});
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const years=(a,b)=>(pD(b)-pD(a))/31557600000;
+function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2400);}
+function slopePerYear(pts){if(pts.length<2)return null;const x0=pD(pts[0].x);const xs=pts.map(p=>(pD(p.x)-x0)/31557600000),ys=pts.map(p=>p.y);const n=xs.length,mx=xs.reduce((a,b)=>a+b)/n,my=ys.reduce((a,b)=>a+b)/n;let sxy=0,sxx=0;xs.forEach((x,i)=>{sxy+=(x-mx)*(ys[i]-my);sxx+=(x-mx)**2;});return sxx?sxy/sxx:null;}
+function navy(cintura,cuello,talla){if(!cintura||!cuello||!talla||cintura<=cuello)return null;return 495/(1.0324-0.19077*Math.log10(cintura-cuello)+0.15456*Math.log10(talla))-450;}
+function armDelete(btn,fn){btn.addEventListener("click",()=>{if(btn.dataset.armed){fn();}else{btn.dataset.armed="1";btn.textContent="¿Borrar?";btn.style.color="var(--warn)";setTimeout(()=>{if(btn.isConnected){delete btn.dataset.armed;btn.textContent="Borrar";btn.style.color="";}},3000);}});}
+
+/* ================= Gráfico de líneas (SVG) ================= */
+function lineChart(series,opt={}){
+  const W=640,H=opt.h||220,L=40,R=10,T=14,B=26;
+  const all=series.flatMap(s=>s.pts);if(!all.length)return `<div class="empty">Sin datos para graficar.</div>`;
+  const xs=all.map(p=>pD(p.x).getTime());let x0=Math.min(...xs),x1=Math.max(...xs);if(x0===x1){x0-=864e5*15;x1+=864e5*15;}
+  let y0=Math.min(...all.map(p=>p.y)),y1=Math.max(...all.map(p=>p.y));if(opt.ref!=null){y0=Math.min(y0,opt.ref);y1=Math.max(y1,opt.ref);}
+  const padY=(y1-y0)*0.12||1;y0-=padY;y1+=padY;
+  const X=t=>L+(W-L-R)*(t-x0)/(x1-x0),Y=v=>T+(H-T-B)*(1-(v-y0)/(y1-y0));
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opt.label||"Gráfico")}">`;
+  for(let i=0;i<=4;i++){const v=y0+(y1-y0)*i/4,y=Y(v);s+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-5}" y="${y+4}" text-anchor="end">${fmt(v,(y1-y0)<8?1:0)}</text>`;}
+  const yr0=new Date(x0).getFullYear(),yr1=new Date(x1).getFullYear();
+  if(yr1>yr0){for(let y=yr0+1;y<=yr1;y++){const t=new Date(y,0,1).getTime();const x=X(t);s+=`<line x1="${x}" x2="${x}" y1="${T}" y2="${H-B}" stroke="var(--line)" stroke-dasharray="3 3"/><text x="${x}" y="${H-8}" text-anchor="middle">${y}</text>`;}}
+  else{[x0,(x0+x1)/2,x1].forEach((t,i)=>{s+=`<text x="${X(t)}" y="${H-8}" text-anchor="${["start","middle","end"][i]}">${new Date(t).toLocaleDateString("es-BO",{day:"2-digit",month:"short"})}</text>`;});}
+  if(opt.ref!=null){const y=Y(opt.ref);s+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--warn)" stroke-dasharray="5 4"/><text x="${W-R}" y="${y-4}" text-anchor="end" style="fill:var(--warn)">${esc(opt.refLabel||"")}</text>`;}
+  series.forEach(se=>{const p=se.pts.slice().sort((a,b)=>a.x.localeCompare(b.x));if(!p.length)return;
+    s+=`<polyline fill="none" stroke="${se.color}" stroke-width="2" points="${p.map(q=>X(pD(q.x).getTime())+","+Y(q.y)).join(" ")}"/>`;
+    p.forEach((q,i)=>{s+=`<circle cx="${X(pD(q.x).getTime())}" cy="${Y(q.y)}" r="${i===p.length-1?4.5:3}" fill="${se.color}"><title>${fD(q.x)}: ${fmt(q.y,1)}</title></circle>`;});});
+  s+=`</svg>`;
+  if(series.length>1)s+=`<div class="row" style="gap:14px;font-size:12px">${series.map(se=>`<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${se.color};margin-right:5px"></span>${esc(se.name)}</span>`).join("")}</div>`;
+  return s;
+}
+const C=()=>{const cs=getComputedStyle(document.documentElement);return{a:cs.getPropertyValue("--accent").trim(),c:cs.getPropertyValue("--cardio").trim(),w:cs.getPropertyValue("--warn").trim(),m:cs.getPropertyValue("--muted").trim()};};
+
+/* ================= Navegación ================= */
+let view="inicio";
+document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.v)));
+$("btn-datos").addEventListener("click",()=>go("datos"));
+function go(v){view=v;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===v?"true":"false"));try{localStorage.setItem(KEY+"-view",v);}catch(e){}render();window.scrollTo(0,0);}
+function render(){const m=$("main");m.innerHTML="";const f={inicio:vInicio,entreno:vEntreno,cuerpo:vCuerpo,balanza:vBalanza,lab:vLab,datos:vDatos}[view];f(m);}
+
+/* ================= Cálculos de entrenamiento ================= */
+const BASE=[
+ {id:"fondos",name:"Fondos en paralelas",group:"Tren superior",kind:"reps",bw:1},{id:"dominadas",name:"Dominadas",group:"Tren superior",kind:"reps",bw:1},
+ {id:"flexiones",name:"Flexiones",group:"Tren superior",kind:"reps",bw:1},{id:"press",name:"Press militar mancuernas",group:"Tren superior",kind:"reps"},
+ {id:"remo",name:"Remo a una mano",group:"Tren superior",kind:"reps",side:1},{id:"pullover",name:"Pullover mancuerna",group:"Tren superior",kind:"reps"},
+ {id:"curl",name:"Curl bíceps",group:"Tren superior",kind:"reps"},{id:"triceps",name:"Extensión tríceps",group:"Tren superior",kind:"reps"},
+ {id:"goblet",name:"Sentadilla goblet",group:"Tren inferior",kind:"reps"},{id:"zancadas",name:"Zancadas",group:"Tren inferior",kind:"reps",side:1},
+ {id:"rumano",name:"Peso muerto rumano",group:"Tren inferior",kind:"reps"},{id:"talones",name:"Elevación de talones",group:"Tren inferior",kind:"reps",bw:1,side:1},
+ {id:"plancha",name:"Plancha",group:"Core",kind:"time"},{id:"bici-est",name:"Bicicleta estática",group:"Cardio",kind:"cardio"},
+ {id:"bici-ruta",name:"Bicicleta de ruta",group:"Cardio",kind:"bike"},{id:"caminata",name:"Caminata",group:"Cardio",kind:"cardio"}];
+const GROUPS=["Tren superior","Tren inferior","Core","Cardio"];
+const catalog=()=>BASE.concat(S.ejerciciosPropios||[]);
+const findEx=id=>catalog().find(e=>e.id===id);
+const isCardio=k=>k==="cardio"||k==="bike";
+function weekStart(s){const d=pD(s);d.setDate(d.getDate()-((d.getDay()+6)%7));return iso(d);}
+function agg(list){const r={days:new Set(),sets:0,reps:0,ton:0,cmin:0,km:0,elev:0};list.forEach(e=>{r.days.add(e.date);if(e.kind==="reps"){r.sets+=e.sets;r.reps+=e.sets*e.reps;r.ton+=e.sets*e.reps*(e.kg||0);}else if(e.kind==="time"){r.sets+=e.sets;}else{r.cmin+=e.min||0;if(e.exId.startsWith("bici")){r.km+=e.km||0;r.elev+=e.elev||0;}}});return r;}
+function describe(e){if(e.kind==="reps")return e.sets+"×"+e.reps+(e.kg?" · "+fmt(e.kg,e.kg%1?1:0)+" kg":"")+(e.side&&e.side!=="Ambos"?" · "+e.side:"");if(e.kind==="time")return e.sets+"×"+e.secs+" s";let s=fmt(e.min)+" min";if(e.km)s+=" · "+fmt(e.km,e.km%1?1:0)+" km";if(e.elev)s+=" · +"+fmt(e.elev)+" m";if(e.km&&e.min)s+=" · "+fmt(e.km/(e.min/60),1)+" km/h";return s;}
+
+/* ================= INICIO ================= */
+function latest(arr,key){const a=arr.filter(r=>r[key]!=null).sort((x,y)=>(x.fecha+(x.hora||"")).localeCompare(y.fecha+(y.hora||"")));return a[a.length-1];}
+function vInicio(m){
+  $("title").textContent="Mi Salud";$("subtitle").textContent="Resumen al "+fDay(today());
+  const P=S.parametros;
+  if(!S.medidas.length&&!S.balanza.length&&!S.laboratorio.length&&!S.entrenos.length){
+    m.innerHTML=`<div class="panel"><h2>Bienvenido</h2><p>Esta app guarda todo en este teléfono, sin internet. Para cargar su historial (medidas desde 2022, balanza, análisis de laboratorio y eventos), toque <b>Cargar respaldo</b> y elija el archivo <b>salud-respaldo.json</b>.</p><div class="row"><button class="btn" id="b-imp">Cargar respaldo</button><button class="btn ghost" id="b-new">Empezar vacío</button></div></div>`;
+    $("b-imp").onclick=()=>$("file-in").click();$("b-new").onclick=()=>go("entreno");return;}
+  const lp=latest(S.balanza,"peso"),lm=latest(S.medidas,"cintura");
+  const peso=lp&&(!lm||lp.fecha>=lm.fecha||!lm.peso)?{v:lp.peso,f:lp.fecha}:(lm&&lm.peso?{v:lm.peso,f:lm.fecha}:null);
+  const whtr=lm?lm.cintura/P.talla:null;
+  const lmN=latest(S.medidas,"cintura");const bf=lmN?navy(lmN.cintura,lmN.cuello||P.cuelloRef,P.talla):null;
+  const lb=latest(S.balanza,"grasa");const bfB=lb?lb.grasa+(lb.amr/lb.bmr>1.45?P.correccionBeurer:0):null;
+  const wk=agg(S.entrenos.filter(e=>weekStart(e.date)===weekStart(today())));
+  const ll=S.laboratorio.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha)).pop();
+  const labMonths=ll?Math.floor(years(ll.fecha,today())*12):null;
+  const cards=[
+    ["Peso",peso?fmt(peso.v,1)+" kg":"—",peso?fD(peso.f):"",false],
+    ["Cintura",lm?fmt(lm.cintura,1)+" cm":"—",lm?"meta ≤ "+Math.round(P.talla*0.5)+" cm":"",lm&&lm.cintura>Math.round(P.talla*0.5)],
+    ["Cintura / talla",whtr?fmt(whtr,3):"—","meta < 0,500",whtr>0.5],
+    ["% grasa (cinta, Navy)",bf?fmt(bf,1)+" %":"—","con cuello "+(lmN&&lmN.cuello?"medido":"de referencia"),false],
+    ["% grasa (balanza, corregida)",bfB?fmt(bfB,1)+" %":"—",lb?fD(lb.fecha):"",false],
+    ["Esta semana",wk.sets+" series",fmt(wk.cmin)+" min cardio · "+fmt(wk.km,1)+" km bici",false],
+    ["Último análisis",ll?fD(ll.fecha):"—",labMonths!=null?"hace "+labMonths+" meses":"",labMonths>12]];
+  let h=`<div class="panel"><h2>Hoy</h2><div class="stats">${cards.map(c=>`<div class="stat${c[3]?" alert":""}"><span>${c[0]}</span><b>${c[1]}</b><span>${esc(c[2])}</span></div>`).join("")}</div></div>`;
+  // tendencia grasa balanza
+  const bpts=S.balanza.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*(r.grasa+(r.amr/r.bmr>1.45?P.correccionBeurer:0))/100}));
+  const ffm=S.balanza.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*(1-(r.grasa+(r.amr/r.bmr>1.45?P.correccionBeurer:0))/100)}));
+  const sF=slopePerYear(bpts),sM=slopePerYear(ffm);
+  const msgs=[];
+  if(sF!=null)msgs.push(`Grasa (balanza, corregida): ${sF>=0?"+":""}${fmt(sF,1)} kg/año · masa libre de grasa: ${sM>=0?"+":""}${fmt(sM,1)} kg/año.`);
+  if(labMonths>12)msgs.push(`Hace ${labMonths} meses que no se hace análisis. Pendientes: HbA1c, glucosa e insulina, perfil lipídico + ApoB + Lp(a), TSH, T4 libre, anti-TPO, GOT/GPT/GGT, creatinina, B12, hemograma, orina y ecografía abdominal.`);
+  if(msgs.length)h+=`<div class="panel"><h2>Para tener en cuenta</h2>${msgs.map(t=>`<div class="note${t.startsWith("Hace")?" w":""}">${esc(t)}</div>`).join("")}</div>`;
+  h+=`<div class="panel"><h2>Peso y cintura</h2><div class="chart" id="ch1"></div></div>`;
+  m.innerHTML=h;
+  const c=C();
+  const pw=S.medidas.filter(r=>r.peso).map(r=>({x:r.fecha,y:r.peso})).concat(S.balanza.map(r=>({x:r.fecha,y:r.peso})));
+  $("ch1").innerHTML=lineChart([{name:"Peso (kg)",color:c.a,pts:pw},{name:"Cintura (cm)",color:c.w,pts:S.medidas.filter(r=>r.cintura).map(r=>({x:r.fecha,y:r.cintura}))}],{label:"Peso y cintura"});
+}
+
+/* ================= ENTRENO ================= */
+let selEx=null,entDate=null;
+function vEntreno(m){
+  $("title").textContent="Entreno";$("subtitle").textContent="Series × repeticiones · bicicleta en km, desnivel y tiempo";
+  entDate=entDate||today();
+  m.innerHTML=`<div class="panel"><div class="row between"><h2>Registrar</h2><input type="date" id="e-date" value="${entDate}" style="width:165px"></div><div id="cat" style="display:flex;flex-direction:column;gap:10px"></div><div id="eform"></div></div>
+  <div class="panel"><div class="row between"><h2 id="d-title"></h2><span class="hint" id="d-sum"></span></div><ul class="list" id="d-list"></ul></div>
+  <div class="panel"><h2>Series de fuerza por semana</h2><p class="hint">Referencia para ganar músculo: 10–20 series semanales por grupo muscular.</p><div class="chart" id="ch-w"></div><div class="tbl"><table id="t-w"></table></div></div>
+  <div class="panel"><h2>Progreso por ejercicio</h2><div class="tbl"><table id="t-p"></table></div></div>`;
+  $("e-date").onchange=e=>{entDate=e.target.value||today();drawDay();};
+  drawCat();drawForm();drawDay();drawWeeks();drawProg();
+}
+function drawCat(){const box=$("cat");box.innerHTML="";GROUPS.forEach(g=>{const it=catalog().filter(e=>e.group===g);if(!it.length)return;
+  const d=document.createElement("div");d.innerHTML=`<div class="lbl" style="margin-bottom:5px">${g}</div><div class="chips"></div>`;const ch=d.querySelector(".chips");
+  it.forEach(e=>{const b=document.createElement("button");b.className="chip"+(isCardio(e.kind)?" c":"");b.textContent=e.name;b.setAttribute("aria-pressed",selEx===e.id?"true":"false");b.onclick=()=>{selEx=e.id;drawCat();drawForm();};ch.appendChild(b);});
+  if(g==="Cardio"){const a=document.createElement("button");a.className="chip add";a.textContent="+ Ejercicio";a.onclick=addExercise;ch.appendChild(a);}
+  box.appendChild(d);});}
+function stepper(id,label,val,step,min,dec){return `<div class="field"><label class="lbl" for="${id}">${label}</label><div class="stepper"><button type="button" data-s="${id}" data-d="-${step}" aria-label="Menos">−</button><input type="number" inputmode="decimal" id="${id}" value="${val}" min="${min}" step="${step}" data-dec="${dec||0}"><button type="button" data-s="${id}" data-d="${step}" aria-label="Más">+</button></div></div>`;}
+function lastOf(id){return S.entrenos.filter(e=>e.exId===id).sort((a,b)=>(b.date+b.ts).localeCompare(a.date+a.ts))[0];}
+function drawForm(){const f=$("eform");if(!selEx){f.innerHTML=`<p class="hint">Toque un ejercicio para registrarlo.</p>`;return;}
+  const ex=findEx(selEx),L=lastOf(selEx);let h=`<div><b>${esc(ex.name)}</b><span class="tag${isCardio(ex.kind)?" c":""}">${ex.group}</span></div>`;
+  if(L)h+=`<div class="prev">Última vez (${fD(L.date)}): ${esc(describe(L))}${L.note?" — "+esc(L.note):""}</div>`;
+  h+=`<div class="fields">`;
+  if(ex.kind==="reps"){h+=stepper("f-sets","Series",L?L.sets:3,1,1)+stepper("f-reps","Reps por serie",L?L.reps:10,1,1)+stepper("f-kg",ex.bw?"Lastre (kg)":"Peso total (kg)",L?L.kg:(ex.bw?0:15),2.5,0,1);}
+  else if(ex.kind==="time"){h+=stepper("f-sets","Series",L?L.sets:3,1,1)+stepper("f-secs","Segundos por serie",L?L.secs:45,5,5);}
+  else{h+=stepper("f-min","Tiempo (min)",L?L.min:30,5,1)+stepper("f-km","Distancia (km)",L?L.km:(ex.kind==="bike"?15:3),0.5,0,1);if(ex.kind==="bike")h+=stepper("f-elev","Desnivel + (m)",L?L.elev:150,10,0);}
+  h+=`</div>`;
+  if(ex.side)h+=`<div class="field"><span class="lbl">Lado</span><div class="chips" id="f-side">${["Ambos","Izq","Der"].map(s=>`<button type="button" class="chip" data-side="${s}" aria-pressed="${((L&&L.side)||"Ambos")===s}">${s}</button>`).join("")}</div></div>`;
+  h+=`<div class="field"><label class="lbl" for="f-note">Nota</label><input id="f-note" placeholder="Opcional: al fallo, molestia…"></div><div class="row"><button class="btn" id="f-save">Guardar</button></div>`;
+  f.innerHTML=h;f.style.display="flex";f.style.flexDirection="column";f.style.gap="10px";
+  f.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{const i=$(b.dataset.s);let v=Math.max(+i.min||0,(num(i.value)||0)+parseFloat(b.dataset.d));i.value=+i.dataset.dec?String(+v.toFixed(1)):Math.round(v);});
+  f.querySelectorAll("[data-side]").forEach(b=>b.onclick=()=>f.querySelectorAll("[data-side]").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false")));
+  $("f-save").onclick=()=>{const e={id:"e"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:entDate,exId:ex.id,name:ex.name,group:ex.group,kind:ex.kind,note:$("f-note").value.trim(),ts:new Date().toISOString()};
+    if(ex.kind==="reps"){e.sets=Math.round(num($("f-sets").value)||0);e.reps=Math.round(num($("f-reps").value)||0);e.kg=num($("f-kg").value)||0;}
+    else if(ex.kind==="time"){e.sets=Math.round(num($("f-sets").value)||0);e.secs=Math.round(num($("f-secs").value)||0);}
+    else{e.min=num($("f-min").value)||0;e.km=num($("f-km").value)||0;if(ex.kind==="bike")e.elev=Math.round(num($("f-elev").value)||0);}
+    if(ex.side){const s=f.querySelector('[data-side][aria-pressed="true"]');e.side=s?s.dataset.side:"Ambos";}
+    if((e.sets!=null&&e.sets<1)||(isCardio(e.kind)&&e.min<=0)){toast("Revise los valores");return;}
+    S.entrenos.push(e);save();toast("Guardado: "+e.name);$("f-note").value="";drawForm();drawDay();drawWeeks();drawProg();};
+}
+function drawDay(){$("d-title").textContent=entDate===today()?"Hoy":fDay(entDate);const list=S.entrenos.filter(e=>e.date===entDate).sort((a,b)=>a.ts.localeCompare(b.ts));const ul=$("d-list");ul.innerHTML="";
+  if(!list.length){ul.innerHTML=`<li style="display:block"><div class="empty">Sin registros este día.</div></li>`;$("d-sum").textContent="";return;}
+  list.forEach(e=>{const li=document.createElement("li");li.innerHTML=`<div><b>${esc(e.name)}</b>${e.note?`<div class="hint">${esc(e.note)}</div>`:""}</div><button class="del">Borrar</button><div class="big">${esc(describe(e))}</div>`;armDelete(li.querySelector(".del"),()=>{S.entrenos=S.entrenos.filter(x=>x.id!==e.id);save();drawDay();drawWeeks();drawProg();toast("Borrado");});ul.appendChild(li);});
+  const a=agg(list);$("d-sum").textContent=[a.sets?a.sets+" series":"",a.cmin?fmt(a.cmin)+" min cardio":""].filter(Boolean).join(" · ");}
+function drawWeeks(){const ws=[];let d=pD(weekStart(today()));for(let i=0;i<12;i++){ws.unshift(iso(d));d.setDate(d.getDate()-7);}
+  const A=ws.map(w=>agg(S.entrenos.filter(e=>weekStart(e.date)===w)));const c=C();
+  const W=640,H=180,L=30,B=24,T=12,bw=(W-L-8)/12,mx=Math.max(4,...A.map(a=>a.sets));
+  let s=`<svg viewBox="0 0 ${W} ${H}">`;[0,.5,1].forEach(f=>{const y=T+(H-T-B)*(1-f);s+=`<line x1="${L}" x2="${W-8}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-4}" y="${y+4}" text-anchor="end">${Math.round(mx*f)}</text>`;});
+  A.forEach((a,i)=>{const h=(H-T-B)*a.sets/mx,x=L+i*bw+bw*.2;s+=`<rect x="${x}" y="${H-B-h}" width="${bw*.6}" height="${h}" rx="3" fill="${c.a}" opacity="${i===11?1:.6}"/>`;if(a.sets)s+=`<text x="${x+bw*.3}" y="${H-B-h-4}" text-anchor="middle">${a.sets}</text>`;if(i%3===2)s+=`<text x="${x+bw*.3}" y="${H-7}" text-anchor="middle">${pD(ws[i]).toLocaleDateString("es-BO",{day:"2-digit",month:"short"})}</text>`;});
+  $("ch-w").innerHTML=s+"</svg>";
+  $("t-w").innerHTML=`<thead><tr><th>Semana</th><th>Días</th><th>Series</th><th>Reps</th><th>Kg×reps</th><th>Cardio min</th><th>Bici km</th><th>Desnivel</th></tr></thead><tbody>${ws.map((w,i)=>[w,A[i]]).reverse().slice(0,6).map(([w,a])=>`<tr><td>${pD(w).toLocaleDateString("es-BO",{day:"2-digit",month:"short"})}</td><td>${a.days.size}</td><td>${a.sets}</td><td>${fmt(a.reps)}</td><td>${fmt(a.ton)}</td><td>${fmt(a.cmin)}</td><td>${fmt(a.km,1)}</td><td>${fmt(a.elev)}</td></tr>`).join("")}</tbody>`;}
+function drawProg(){const ids=[...new Set(S.entrenos.map(e=>e.exId))];const t=$("t-p");if(!ids.length){t.innerHTML=`<tbody><tr><td class="empty">Su mejor marca por ejercicio aparecerá aquí.</td></tr></tbody>`;return;}
+  const cut=new Date();cut.setDate(cut.getDate()-28);const cs=iso(cut);
+  t.innerHTML=`<thead><tr><th>Ejercicio</th><th>Última</th><th>Fecha</th><th>Mejor</th><th>Series 4 sem</th></tr></thead><tbody>${ids.map(id=>{const L=S.entrenos.filter(e=>e.exId===id).sort((a,b)=>(b.date+b.ts).localeCompare(a.date+a.ts));const l=L[0];let best;
+    if(l.kind==="reps"){const mk=Math.max(...L.map(e=>e.kg||0));best=mk>0?fmt(mk,mk%1?1:0)+" kg × "+L.filter(e=>(e.kg||0)===mk).sort((a,b)=>b.reps-a.reps)[0].reps:Math.max(...L.map(e=>e.reps))+" reps";}
+    else if(l.kind==="time")best=Math.max(...L.map(e=>e.secs))+" s";else{const mk=Math.max(...L.map(e=>e.km||0));best=mk?fmt(mk,1)+" km":fmt(Math.max(...L.map(e=>e.min)))+" min";}
+    return `<tr><td>${esc(l.name)}</td><td>${esc(describe(l))}</td><td>${fD(l.date)}</td><td>${best}</td><td>${isCardio(l.kind)?"—":L.filter(e=>e.date>=cs).reduce((s,e)=>s+(e.sets||0),0)}</td></tr>`;}).join("")}</tbody>`;}
+function addExercise(){const f=$("eform");f.innerHTML=`<div class="fields"><div class="field"><label class="lbl" for="n-name">Nombre</label><input id="n-name"></div><div class="field"><label class="lbl" for="n-g">Grupo</label><select id="n-g">${GROUPS.map(g=>`<option>${g}</option>`).join("")}</select></div><div class="field"><label class="lbl" for="n-k">Se mide en</label><select id="n-k"><option value="reps">Series × reps</option><option value="time">Series × segundos</option><option value="cardio">Tiempo y distancia</option><option value="bike">Tiempo, distancia y desnivel</option></select></div></div><div class="row"><button class="btn" id="n-ok">Agregar ejercicio</button><button class="btn ghost" id="n-x">Cancelar</button></div>`;
+  $("n-x").onclick=drawForm;$("n-ok").onclick=()=>{const n=$("n-name").value.trim();if(!n){toast("Escriba un nombre");return;}const e={id:"c"+Date.now().toString(36),name:n,group:$("n-g").value,kind:$("n-k").value};S.ejerciciosPropios.push(e);save();selEx=e.id;drawCat();drawForm();};}
+
+/* ================= MEDIDAS ================= */
+const MF=[["peso","Peso","kg"],["cintura","Cintura","cm"],["pecho","Pecho","cm"],["bicepI","Bícep izq","cm"],["bicepD","Bícep der","cm"],["antI","Antebrazo izq","cm"],["antD","Antebrazo der","cm"],["musloI","Muslo izq","cm"],["musloD","Muslo der","cm"],["piernaI","Pantorrilla izq","cm"],["piernaD","Pantorrilla der","cm"],["rodI","Sobre rótula izq","cm"],["rodD","Sobre rótula der","cm"],["cuello","Cuello","cm"],["cadera","Cadera","cm"]];
+function vCuerpo(m){
+  $("title").textContent="Medidas";$("subtitle").textContent="Perímetros con cinta: mañana, en ayunas, 2 tomas";
+  const P=S.parametros,rows=S.medidas.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha)),last=rows[rows.length-1]||{};
+  m.innerHTML=`<div class="panel"><div class="row between"><h2>Nueva medición</h2><input type="date" id="m-date" value="${today()}" style="width:165px"></div>
+  <p class="hint">Deje en blanco lo que no midió. Entre paréntesis, la última medición.</p>
+  <div class="fields">${MF.map(([k,l,u])=>`<div class="field"><label class="lbl" for="m-${k}">${l} (${last[k]!=null?fmt(last[k],1):"—"})</label><input id="m-${k}" inputmode="decimal" placeholder="${u}"></div>`).join("")}</div>
+  <div class="field"><label class="lbl" for="m-nota">Nota</label><input id="m-nota"></div><div class="row"><button class="btn" id="m-save">Guardar medición</button></div></div>
+  <div class="panel"><div class="row between"><h2>Evolución</h2><select id="m-var" style="width:auto">${[["cintura","Cintura"],["peso","Peso"],["whtr","Cintura / talla"],["navy","% grasa (Navy)"],["bic","Bícep promedio"],["mus","Muslo promedio"],["pie","Pantorrillas"],["pecho","Pecho"],["rod","Sobre rótula"]].map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select></div><div class="chart" id="m-ch"></div><div class="hint" id="m-trend"></div></div>
+  <div class="panel"><h2>Historial</h2><div class="tbl"><table id="m-t"></table></div></div>`;
+  $("m-save").onclick=()=>{const r={fecha:$("m-date").value||today()};let n=0;MF.forEach(([k])=>{const v=num($("m-"+k).value);if(v!=null){r[k]=v;n++;}});const t=$("m-nota").value.trim();if(t)r.nota=t;if(!n){toast("Ingrese al menos una medida");return;}
+    const i=S.medidas.findIndex(x=>x.fecha===r.fecha);if(i>=0)S.medidas[i]=Object.assign({},S.medidas[i],r);else S.medidas.push(r);save();toast("Medición guardada");vCuerpo(m);};
+  const draw=()=>{const v=$("m-var").value,c=C();let pts=[],ser=[],opt={};
+    const pairAvg=(a,b)=>rows.filter(r=>r[a]!=null&&r[b]!=null).map(r=>({x:r.fecha,y:(r[a]+r[b])/2}));
+    if(v==="whtr"){pts=rows.filter(r=>r.cintura).map(r=>({x:r.fecha,y:r.cintura/P.talla}));opt={ref:.5,refLabel:"meta 0,50"};}
+    else if(v==="navy"){pts=rows.filter(r=>r.cintura).map(r=>({x:r.fecha,y:navy(r.cintura,r.cuello||P.cuelloRef,P.talla)}));}
+    else if(v==="bic")ser=[{name:"Promedio",color:c.a,pts:pairAvg("bicepI","bicepD")}];
+    else if(v==="mus")ser=[{name:"Izq",color:c.a,pts:rows.filter(r=>r.musloI).map(r=>({x:r.fecha,y:r.musloI}))},{name:"Der",color:c.c,pts:rows.filter(r=>r.musloD).map(r=>({x:r.fecha,y:r.musloD}))}];
+    else if(v==="pie")ser=[{name:"Izq (Aquiles 2020)",color:c.w,pts:rows.filter(r=>r.piernaI).map(r=>({x:r.fecha,y:r.piernaI}))},{name:"Der",color:c.c,pts:rows.filter(r=>r.piernaD).map(r=>({x:r.fecha,y:r.piernaD}))}];
+    else if(v==="rod")ser=[{name:"Izq",color:c.a,pts:rows.filter(r=>r.rodI).map(r=>({x:r.fecha,y:r.rodI}))},{name:"Der",color:c.c,pts:rows.filter(r=>r.rodD).map(r=>({x:r.fecha,y:r.rodD}))}];
+    else{pts=rows.filter(r=>r[v]!=null).map(r=>({x:r.fecha,y:r[v]}));if(v==="cintura")opt={ref:Math.round(P.talla*.5),refLabel:"meta"};}
+    if(!ser.length)ser=[{name:v,color:v==="cintura"?c.w:c.a,pts}];
+    $("m-ch").innerHTML=lineChart(ser,opt);const sp=ser[0].pts;const sl=slopePerYear(sp.slice().sort((a,b)=>a.x.localeCompare(b.x)));
+    $("m-trend").textContent=sp.length>1?`Primero ${fmt(sp[0].y,v==="whtr"?3:1)} → último ${fmt(sp[sp.length-1].y,v==="whtr"?3:1)}. Tendencia: ${sl>=0?"+":""}${fmt(sl,v==="whtr"?3:2)} por año.`:"";};
+  $("m-var").onchange=draw;draw();
+  const cols=MF.filter(([k])=>rows.some(r=>r[k]!=null));
+  $("m-t").innerHTML=`<thead><tr><th>Fecha</th>${cols.map(([,l])=>`<th>${l}</th>`).join("")}<th></th></tr></thead><tbody>${rows.slice().reverse().map(r=>`<tr><td>${fD(r.fecha)}${r.nota?` <span title="${esc(r.nota)}">•</span>`:""}</td>${cols.map(([k])=>`<td>${r[k]!=null?fmt(r[k],r[k]%1?1:0):""}</td>`).join("")}<td><button class="del" data-f="${r.fecha}">Borrar</button></td></tr>`).join("")}</tbody>`;
+  m.querySelectorAll("#m-t .del").forEach(b=>armDelete(b,()=>{S.medidas=S.medidas.filter(x=>x.fecha!==b.dataset.f);save();vCuerpo(m);}));
+}
+
+/* ================= BALANZA ================= */
+function vBalanza(m){
+  $("title").textContent="Balanza";$("subtitle").textContent="Beurer BF 710 · use el peso; la grasa sale casi solo del peso";
+  const P=S.parametros,rows=S.balanza.slice().sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const corr=r=>r.grasa!=null?r.grasa+(r.amr&&r.bmr&&r.amr/r.bmr>1.45?P.correccionBeurer:0):null;
+  m.innerHTML=`<div class="panel"><div class="row between"><h2>Nueva pesada</h2></div>
+  <div class="fields"><div class="field"><label class="lbl" for="b-date">Fecha</label><input type="date" id="b-date" value="${today()}"></div><div class="field"><label class="lbl" for="b-hora">Hora</label><input type="time" id="b-hora" value="${pad(new Date().getHours())}:${pad(new Date().getMinutes())}"></div>
+  ${[["peso","Peso kg"],["grasa","Grasa %"],["agua","Agua %"],["musculo","Músculo %"],["hueso","Huesos kg"],["bmr","Metab. basal kcal"],["amr","Metab. activo kcal"]].map(([k,l])=>`<div class="field"><label class="lbl" for="b-${k}">${l}</label><input id="b-${k}" inputmode="decimal"></div>`).join("")}</div>
+  <p class="hint">Copie los valores de la app de Beurer. Los metabolismos permiten detectar si cambió el nivel de actividad del perfil.</p><div class="row"><button class="btn" id="b-save">Guardar pesada</button></div></div>
+  <div class="panel"><h2>Peso y grasa corregida</h2><div class="chart" id="b-ch"></div><div class="hint" id="b-tr"></div></div>
+  <div class="panel"><h2>Pesadas</h2><div class="tbl"><table id="b-t"></table></div></div>`;
+  $("b-save").onclick=()=>{const r={fecha:$("b-date").value||today(),hora:$("b-hora").value||"00:00"};["peso","grasa","agua","musculo","hueso","bmr","amr"].forEach(k=>{const v=num($("b-"+k).value);if(v!=null)r[k]=v;});if(r.peso==null){toast("Ingrese al menos el peso");return;}S.balanza.push(r);save();toast("Pesada guardada");vBalanza(m);};
+  const c=C();const fk=rows.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*corr(r)/100})),ff=rows.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*(1-corr(r)/100)}));
+  $("b-ch").innerHTML=lineChart([{name:"Peso (kg)",color:c.a,pts:rows.map(r=>({x:r.fecha,y:r.peso}))},{name:"Masa grasa corregida (kg)",color:c.w,pts:fk}],{label:"Balanza"});
+  const s1=slopePerYear(fk),s2=slopePerYear(ff);$("b-tr").textContent=s1!=null?`Tendencia: grasa ${s1>=0?"+":""}${fmt(s1,1)} kg/año · masa libre de grasa ${s2>=0?"+":""}${fmt(s2,1)} kg/año (corrección de ${fmt(P.correccionBeurer,1)} puntos a pesadas con factor 1,50).`:"";
+  $("b-t").innerHTML=`<thead><tr><th>Fecha</th><th>Hora</th><th>Peso</th><th>Grasa %</th><th>Grasa corr.</th><th>Músculo %</th><th>Agua %</th><th>Factor</th><th></th></tr></thead><tbody>${rows.slice().reverse().map((r,i)=>`<tr><td>${fD(r.fecha)}</td><td>${esc(r.hora||"")}</td><td>${fmt(r.peso,1)}</td><td>${r.grasa!=null?fmt(r.grasa,1):""}</td><td>${r.grasa!=null?fmt(corr(r),1):""}</td><td>${r.musculo!=null?fmt(r.musculo,1):""}</td><td>${r.agua!=null?fmt(r.agua,1):""}</td><td>${r.amr&&r.bmr?fmt(r.amr/r.bmr,2):""}</td><td><button class="del" data-k="${r.fecha}|${r.hora}|${r.peso}">Borrar</button></td></tr>`).join("")}</tbody>`;
+  m.querySelectorAll("#b-t .del").forEach(b=>armDelete(b,()=>{const [f,h,p]=b.dataset.k.split("|");const i=S.balanza.findIndex(x=>x.fecha===f&&(x.hora||"")===h&&String(x.peso)===p);if(i>=0)S.balanza.splice(i,1);save();vBalanza(m);}));
+}
+
+/* ================= LABORATORIO ================= */
+const LF=[["glucosa","Glucosa ayunas","mg/dL",70,99],["insulina","Insulina basal","µUI/mL",2,10],["hba1c","HbA1c","%",null,5.6],["colTotal","Colesterol total","mg/dL",null,199],["hdl","HDL","mg/dL",40,null],["ldl","LDL","mg/dL",null,129],["vldl","VLDL","mg/dL",null,30],["tg","Triglicéridos","mg/dL",null,149],["apob","ApoB","mg/dL",null,100],["lpa","Lp(a)","mg/dL",null,50],["tsh","TSH","µUI/mL",0.4,4.5],["t4l","T4 libre","ng/dL",0.8,1.8],["t3","T3 total","ng/mL",0.69,2.15],["antiTPO","Anti-TPO","UI/mL",null,35],["got","GOT (AST)","U/L",null,40],["gpt","GPT (ALT)","U/L",null,41],["ggt","GGT","U/L",null,60],["creatinina","Creatinina","mg/dL",0.7,1.3],["acUrico","Ácido úrico","mg/dL",3.5,7.2],["b12","Vitamina B12","pg/mL",200,900],["hb","Hemoglobina","g/dL",13.5,18],["leucocitos","Leucocitos","10³/µL",4,10],["plaquetas","Plaquetas","10³/µL",150,400],["ves","VES 1 h","mm/h",null,20],["psa","PSA total","ng/mL",null,4],["glucosa60","Glucosa 60 min","mg/dL",null,180],["insulina60","Insulina 60 min","µUI/mL",null,null],["proteinas","Proteínas totales","g/dL",6.2,7.9],["psaRatio","PSA libre/total","",0.16,1]];
+function idx(r,edad){const o={};if(r.glucosa&&r.insulina)o.homa=r.glucosa*r.insulina/405;if(r.tg&&r.hdl)o.tghdl=r.tg/r.hdl;if(r.colTotal&&r.hdl)o.nohdl=r.colTotal-r.hdl;if(r.gpt&&r.got)o.gptgot=r.gpt/r.got;if(r.creatinina&&edad){const s=r.creatinina/0.9;o.egfr=142*Math.min(s,1)**-0.302*Math.max(s,1)**-1.2*0.9938**edad;}return o;}
+const IF_=[["homa","HOMA-IR",null,2.5,2],["tghdl","TG / HDL",null,2,2],["nohdl","Colesterol no-HDL",null,159,0],["gptgot","GPT / GOT",null,1,2],["egfr","Filtrado renal (CKD-EPI)",90,null,0]];
+function vLab(m){
+  $("title").textContent="Análisis";$("subtitle").textContent="Laboratorio: valores, índices y alertas";
+  const rows=S.laboratorio.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const usedLF=LF.filter(([k])=>rows.some(r=>r[k]!=null));
+  const out=(v,mn,mx)=>v!=null&&((mn!=null&&v<mn)||(mx!=null&&v>mx));
+  let t=`<thead><tr><th>Analito</th><th>Ref.</th>${rows.map(r=>`<th>${fD(r.fecha)}</th>`).join("")}</tr></thead><tbody>`;
+  usedLF.forEach(([k,l,u,mn,mx])=>{t+=`<tr><td>${l}</td><td>${mn!=null?mn:""}${mn!=null&&mx!=null?"–":""}${mx!=null?(mn==null?"≤":"")+mx:(mn!=null?"+":"")}</td>${rows.map(r=>{const ex=r.excluidos&&r.excluidos[k]!=null;const v=r[k];return ex?`<td class="ex" title="${esc(r.excluidos.motivo)}">${fmt(r.excluidos[k],1)}</td>`:`<td class="${out(v,mn,mx)?"hi":""}">${v!=null?fmt(v,v%1?(v<10?2:1):0):""}</td>`;}).join("")}</tr>`;});
+  t+=`<tr><td colspan="${rows.length+2}" class="lbl" style="padding-top:12px">Índices calculados</td></tr>`;
+  IF_.forEach(([k,l,mn,mx,d])=>{t+=`<tr><td>${l}</td><td>${mn!=null?"≥"+mn:"≤"+mx}</td>${rows.map(r=>{const v=idx(r,r.edad||(S.parametros.nacimiento?Math.floor(years(S.parametros.nacimiento,r.fecha)):null))[k];return `<td class="${out(v,mn,mx)?"hi":""}">${v!=null?fmt(v,d):""}</td>`;}).join("")}</tr>`;});
+  t+="</tbody>";
+  m.innerHTML=`<div class="panel"><h2>Resultados</h2><p class="hint">En rojo, fuera de rango. Tachado: excluido (muestra después de corticoide). Deslice la tabla hacia los lados.</p><div class="tbl"><table>${t}</table></div></div>
+  <div class="panel"><div class="row between"><h2>Evolución</h2><select id="l-var" style="width:auto">${usedLF.map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}<option value="homa">HOMA-IR</option><option value="tghdl">TG / HDL</option></select></div><div class="chart" id="l-ch"></div></div>
+  <div class="panel"><details><summary>Agregar análisis nuevo</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+  <div class="fields"><div class="field"><label class="lbl" for="l-date">Fecha</label><input type="date" id="l-date" value="${today()}"></div><div class="field"><label class="lbl" for="l-lab">Laboratorio</label><input id="l-lab"></div><div class="field"><label class="lbl" for="l-edad">Edad</label><input id="l-edad" inputmode="numeric" value="${S.parametros.edad||48}"></div></div>
+  <div class="fields">${LF.slice(0,25).map(([k,l,u])=>`<div class="field"><label class="lbl" for="l-${k}">${l} <span style="text-transform:none">${u}</span></label><input id="l-${k}" inputmode="decimal"></div>`).join("")}</div>
+  <div class="field"><label class="lbl" for="l-ctx">Contexto (ayuno, medicamentos, enfermedad reciente)</label><input id="l-ctx"></div>
+  <div class="row"><button class="btn" id="l-save">Guardar análisis</button></div></div></details></div>
+  <div class="panel"><h2>Pendiente</h2><div class="note w">HbA1c, glucosa e insulina en ayunas, perfil lipídico + ApoB + Lp(a), TSH, T4 libre, anti-TPO, GOT/GPT/GGT, creatinina, vitamina B12, hemograma, orina y ecografía abdominal. 12 h de ayuno, 48 h sin entrenar, 72 h sin alcohol y 2–3 semanas sin corticoides ni enfermedad.</div></div>`;
+  const draw=()=>{const k=$("l-var").value,c=C();const def=LF.find(x=>x[0]===k)||IF_.find(x=>x[0]===k);
+    const pts=rows.map(r=>({x:r.fecha,y:k==="homa"||k==="tghdl"?idx(r,r.edad)[k]:r[k]})).filter(p=>p.y!=null);
+    const ref=def?(def[0]==="homa"||def[0]==="tghdl"?def[3]:(def[4]!=null?def[4]:def[3])):null;
+    $("l-ch").innerHTML=lineChart([{name:k,color:c.a,pts}],{ref,refLabel:"límite"});};
+  if(usedLF.length){$("l-var").onchange=draw;draw();}
+  $("l-save").onclick=()=>{const r={fecha:$("l-date").value||today(),laboratorio:$("l-lab").value.trim(),edad:num($("l-edad").value),contexto:$("l-ctx").value.trim()};let n=0;LF.slice(0,25).forEach(([k])=>{const v=num($("l-"+k).value);if(v!=null){r[k]=v;n++;}});if(!n){toast("Ingrese al menos un valor");return;}S.laboratorio.push(r);save();toast("Análisis guardado");vLab(m);};
+}
+
+/* ================= DATOS ================= */
+function vDatos(m){
+  $("title").textContent="Datos";$("subtitle").textContent="Respaldo, eventos y parámetros";
+  let ts="";try{ts=localStorage.getItem(KEY+"-ts")||"";}catch(e){}
+  const P=S.parametros;
+  m.innerHTML=`<div class="panel"><h2>Respaldo</h2><p>Todo vive solo en este teléfono, dentro del navegador. Descargue un respaldo cada semana y guárdelo en Drive o envíeselo por correo: si borra los datos del navegador o cambia de teléfono, el respaldo es lo único que lo recupera.</p>
+  <div class="stats"><div class="stat"><b>${S.medidas.length}</b><span>mediciones</span></div><div class="stat"><b>${S.balanza.length}</b><span>pesadas</span></div><div class="stat"><b>${S.laboratorio.length}</b><span>análisis</span></div><div class="stat"><b>${S.entrenos.length}</b><span>registros de entreno</span></div></div>
+  <div class="hint">Último cambio: ${ts?new Date(ts).toLocaleString("es-BO"):"—"}</div>
+  <div class="row"><button class="btn" id="d-exp">Descargar respaldo</button><button class="btn ghost" id="d-csv">Entrenos en CSV</button><button class="btn ghost" id="d-imp">Cargar respaldo</button></div>
+  <p class="hint">Cargar un respaldo reemplaza los datos actuales de este teléfono.</p></div>
+  <div class="panel"><h2>Eventos</h2><ul class="list" id="ev"></ul><div class="fields"><div class="field"><label class="lbl" for="ev-f">Fecha</label><input id="ev-f" placeholder="2026-11 o 2026-11-05"></div><div class="field" style="grid-column:span 2"><label class="lbl" for="ev-t">Evento</label><input id="ev-t" placeholder="Ej.: inicia levotiroxina 25 µg"></div></div><div class="row"><button class="btn sm" id="ev-add">Agregar evento</button></div></div>
+  <div class="panel"><h2>Parámetros</h2><div class="fields"><div class="field"><label class="lbl" for="p-talla">Talla (cm)</label><input id="p-talla" inputmode="decimal" value="${P.talla}"></div><div class="field"><label class="lbl" for="p-cuello">Cuello de referencia (cm)</label><input id="p-cuello" inputmode="decimal" value="${P.cuelloRef}"></div><div class="field"><label class="lbl" for="p-corr">Corrección Beurer (puntos)</label><input id="p-corr" inputmode="decimal" value="${P.correccionBeurer}"></div></div><div class="row"><button class="btn sm" id="p-save">Guardar parámetros</button></div></div>
+  <div class="panel"><h2>Borrar todo</h2><p class="hint">Elimina todos los datos de este teléfono. Descargue antes un respaldo.</p><div class="row"><button class="btn warn sm" id="d-wipe">Borrar todos los datos</button></div></div>`;
+  const ev=$("ev");S.eventos.slice().sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))).forEach((e,i)=>{const li=document.createElement("li");li.innerHTML=`<div><b>${esc(e.fecha)}</b><div>${esc(e.texto)}</div></div><button class="del">Borrar</button>`;armDelete(li.querySelector(".del"),()=>{S.eventos=S.eventos.filter(x=>x!==e);save();vDatos(m);});ev.appendChild(li);});
+  $("ev-add").onclick=()=>{const f=$("ev-f").value.trim(),t=$("ev-t").value.trim();if(!f||!t){toast("Complete fecha y evento");return;}S.eventos.push({fecha:f,texto:t});save();vDatos(m);};
+  $("p-save").onclick=()=>{P.talla=num($("p-talla").value)||P.talla;P.cuelloRef=num($("p-cuello").value)||P.cuelloRef;const c=num($("p-corr").value);if(c!=null)P.correccionBeurer=c;save();toast("Parámetros guardados");};
+  $("d-exp").onclick=()=>download("salud-respaldo-"+today()+".json",JSON.stringify(Object.assign({},S,{exportado:new Date().toISOString()}),null,1),"application/json");
+  $("d-csv").onclick=()=>{if(!S.entrenos.length){toast("No hay entrenos");return;}const cols=["date","name","group","kind","side","sets","reps","kg","secs","min","km","elev","note"];const q=v=>{v=v==null?"":String(v);return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};download("entrenos-"+today()+".csv","﻿"+["Fecha","Ejercicio","Grupo","Tipo","Lado","Series","Reps","Kg","Segundos","Minutos","Km","Desnivel_m","Nota"].join(";")+"\n"+S.entrenos.slice().sort((a,b)=>(a.date+a.ts).localeCompare(b.date+b.ts)).map(e=>cols.map(c=>q(e[c])).join(";")).join("\n"),"text/csv");};
+  $("d-imp").onclick=()=>$("file-in").click();
+  const w=$("d-wipe");w.onclick=()=>{if(w.dataset.armed){S=EMPTY();save();toast("Datos borrados");go("inicio");}else{w.dataset.armed="1";w.textContent="Toque de nuevo para confirmar";setTimeout(()=>{if(w.isConnected){delete w.dataset.armed;w.textContent="Borrar todos los datos";}},4000);}};
+}
+function download(name,text,type){const b=new Blob([text],{type});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);toast("Descargado: "+name);}
+$("file-in").addEventListener("change",ev=>{const f=ev.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d||!Array.isArray(d.medidas)||!Array.isArray(d.balanza))throw 0;S=Object.assign(EMPTY(),d);delete S.exportado;save();toast("Respaldo cargado: "+S.medidas.length+" mediciones, "+S.balanza.length+" pesadas, "+S.laboratorio.length+" análisis");go("inicio");}catch(e){toast("Ese archivo no es un respaldo válido de esta app");}ev.target.value="";};rd.readAsText(f);});
+
+/* ================= Arranque ================= */
+load();
+try{const v=localStorage.getItem(KEY+"-view");if(v&&v!=="datos")view=v;}catch(e){}
+go(view);
+if("serviceWorker" in navigator&&location.protocol==="https:"){navigator.serviceWorker.register("sw.js").catch(()=>{});}
+</script>
+</body>
+</html>
