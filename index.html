@@ -203,7 +203,7 @@ function esfuerzo(e,kgCuerpo){const isBike=e.kind==="bike"||String(e.exId).start
   const m=kg+10,g=9.81,d=km*1000,t=min*60,v=d/t,alt=S.parametros.altitud||0,rho=1.225*Math.exp(-alt/8500),CdA=0.40,Crr=0.005;
   const J=Crr*m*g*d+0.5*rho*CdA*v*v*d+m*g*elev;const w=J/t;return {kcal:J/0.22/4184,w,wkg:w/kg,kj:J/1000};}
 function agg(list){const r={days:new Set(),sets:0,reps:0,ton:0,cmin:0,km:0,elev:0,kcal:0};list.forEach(e=>{r.days.add(e.date);if(e.kind==="reps"){r.sets+=e.sets;r.reps+=e.sets*e.reps;r.ton+=e.sets*e.reps*(e.kg||0);}else if(e.kind==="time"){r.sets+=e.sets;}else{r.cmin+=e.min||0;const ef=e.kcal!=null?{kcal:e.kcal}:esfuerzo(e);if(ef)r.kcal+=ef.kcal;if(e.exId.startsWith("bici")){r.km+=e.km||0;r.elev+=e.elev||0;}}});return r;}
-function describe(e){if(e.kind==="reps")return e.sets+"×"+e.reps+(e.kg?" · "+fmt(e.kg,e.kg%1?1:0)+" kg":"")+(e.side&&e.side!=="Ambos"?" · "+e.side:"");if(e.kind==="time")return e.sets+"×"+e.secs+" s";let s=fmt(e.min)+" min";if(e.km)s+=" · "+fmt(e.km,e.km%1?1:0)+" km";if(e.elev)s+=" · +"+fmt(e.elev)+" m";if(e.km&&e.min)s+=" · "+fmt(e.km/(e.min/60),1)+" km/h";const ef=esfuerzo(e);if(ef){s+=" · ≈"+fmt(e.kcal??ef.kcal)+" kcal";if(ef.w)s+=" · "+fmt(e.watts??ef.w)+" W";}return s;}
+function describe(e){if(e.kind==="reps")return e.sets+"×"+e.reps+(e.kg?" · "+fmt(e.kg,e.kg%1?1:0)+" kg":"")+(e.side&&e.side!=="Ambos"?" · "+e.side:"");if(e.kind==="time")return e.sets+"×"+e.secs+" s";let s=fmt(e.min)+" min";if(e.km)s+=" · "+fmt(e.km,e.km%1?1:0)+" km";if(e.elev)s+=" · +"+fmt(e.elev)+" m";if(e.km&&e.min)s+=" · "+fmt(e.km/(e.min/60),1)+" km/h";const ef=esfuerzo(e);const dev=e.kcalDev!=null||e.wDev!=null;if(ef||dev){const k=e.kcalDev??e.kcal??(ef&&ef.kcal);const w=e.wDev??e.watts??(ef&&ef.w);if(k!=null)s+=" · "+(e.kcalDev!=null?"":"≈")+fmt(k)+" kcal";if(w)s+=" · "+(e.wDev!=null?"":"≈")+fmt(w)+" W";}return s;}
 
 /* ================= INDICADORES ================= */
 function spark(pts,color,ref){if(pts.length<2)return "";const p=pts.slice().sort((a,b)=>a.x.localeCompare(b.x));const W=150,H=34;const xs=p.map(q=>pD(q.x).getTime());const x0=Math.min(...xs),x1=Math.max(...xs)||x0+1;let y0=Math.min(...p.map(q=>q.y)),y1=Math.max(...p.map(q=>q.y));if(ref!=null&&ref>=y0-(y1-y0)&&ref<=y1+(y1-y0)){y0=Math.min(y0,ref);y1=Math.max(y1,ref);}if(y1===y0){y1+=1;y0-=1;}
@@ -335,21 +335,26 @@ function drawForm(){const f=$("eform");if(!selEx){f.innerHTML=`<p class="hint">T
   else if(ex.kind==="time"){h+=stepper("f-sets","Series",L?L.sets:3,1,1)+stepper("f-secs","Segundos por serie",L?L.secs:45,5,5);}
   else{h+=stepper("f-min","Tiempo (min)",L?L.min:30,5,1)+stepper("f-km","Distancia (km)",L?L.km:(ex.kind==="bike"?15:3),0.5,0,1);if(ex.kind==="bike")h+=stepper("f-elev","Desnivel + (m)",L?L.elev:150,10,0);}
   h+=`</div>`;
+  if(ex.kind==="bike")h+=`<div class="fields"><div class="field"><label class="lbl" for="f-kcalb">Kcal que marca la bici</label><input id="f-kcalb" inputmode="numeric" placeholder="opcional"></div><div class="field"><label class="lbl" for="f-wb">Vatios promedio (W)</label><input id="f-wb" inputmode="numeric" placeholder="opcional"></div></div>`;
   if(isCardio(ex.kind))h+=`<div class="prev" id="f-ef" style="background:var(--cardio-soft)"></div>`;
   if(ex.side)h+=`<div class="field"><span class="lbl">Lado</span><div class="chips" id="f-side">${["Ambos","Izq","Der"].map(s=>`<button type="button" class="chip" data-side="${s}" aria-pressed="${((L&&L.side)||"Ambos")===s}">${s}</button>`).join("")}</div></div>`;
   h+=`<div class="field"><label class="lbl" for="f-note">Nota</label><input id="f-note" placeholder="Opcional: al fallo, molestia…"></div><div class="row"><button class="btn" id="f-save">Guardar</button></div>`;
   f.innerHTML=h;f.style.display="flex";f.style.flexDirection="column";f.style.gap="10px";
   const upd=()=>{const box=$("f-ef");if(!box)return;const e={exId:ex.id,kind:ex.kind,date:entDate,min:num($("f-min").value)||0,km:num($("f-km").value)||0,elev:$("f-elev")?num($("f-elev").value)||0:0};const ef=esfuerzo(e);const kg=pesoEn(entDate);
-    box.innerHTML=ef?`<b>Esfuerzo estimado: ${fmt(ef.kcal)} kcal</b>${ef.w?` · potencia media ${fmt(ef.w)} W (${fmt(ef.wkg,1)} W/kg) · ${fmt(e.km/(e.min/60),1)} km/h`:""}<div class="hint" style="margin-top:3px">Calculado con su peso (${fmt(kg,1)} kg)${ef.w?`, rodadura, resistencia del aire${S.parametros.altitud?" a "+fmt(S.parametros.altitud)+" m de altitud":""} y desnivel`:""}. Es una estimación: cambie los valores para ver cómo varía.</div>`:`Ingrese tiempo y distancia para estimar el esfuerzo.`;};
+    const kb=$("f-kcalb")?num($("f-kcalb").value):null,wb=$("f-wb")?num($("f-wb").value):null;
+    const devTxt=(kb!=null||wb!=null)?`<b>Según la bicicleta: ${kb!=null?fmt(kb)+" kcal":""}${kb!=null&&wb!=null?" · ":""}${wb!=null?fmt(wb)+" W ("+fmt(wb/kg,1)+" W/kg)":""}</b> — se guardan estos valores.<br>`:"";
+    box.innerHTML=devTxt+(ef?`${devTxt?"Estimación de la app":"<b>Esfuerzo estimado"}: ${fmt(ef.kcal)} kcal${devTxt?"":"</b>"}${ef.w?` · potencia media ${fmt(ef.w)} W (${fmt(ef.wkg,1)} W/kg) · ${fmt(e.km/(e.min/60),1)} km/h`:""}<div class="hint" style="margin-top:3px">Calculado con su peso (${fmt(kg,1)} kg)${ef.w?`, rodadura, resistencia del aire${S.parametros.altitud?" a "+fmt(S.parametros.altitud)+" m de altitud":""} y desnivel`:""}. Es una estimación: cambie los valores para ver cómo varía.</div>`:`Ingrese tiempo y distancia para estimar el esfuerzo.`);};
   f.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{const i=$(b.dataset.s);let v=Math.max(+i.min||0,(num(i.value)||0)+parseFloat(b.dataset.d));i.value=+i.dataset.dec?String(+v.toFixed(1)):Math.round(v);upd();});
-  f.querySelectorAll(".stepper input").forEach(i=>i.addEventListener("input",upd));upd();
+  f.querySelectorAll(".stepper input,#f-kcalb,#f-wb").forEach(i=>i.addEventListener("input",upd));upd();
   f.querySelectorAll("[data-side]").forEach(b=>b.onclick=()=>f.querySelectorAll("[data-side]").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false")));
   $("f-save").onclick=()=>{const e={id:"e"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:entDate,exId:ex.id,name:ex.name,group:ex.group,kind:ex.kind,note:$("f-note").value.trim(),ts:new Date().toISOString()};
     if(ex.kind==="reps"){e.sets=Math.round(num($("f-sets").value)||0);e.reps=Math.round(num($("f-reps").value)||0);e.kg=num($("f-kg").value)||0;}
     else if(ex.kind==="time"){e.sets=Math.round(num($("f-sets").value)||0);e.secs=Math.round(num($("f-secs").value)||0);}
     else{e.min=num($("f-min").value)||0;e.km=num($("f-km").value)||0;if(ex.kind==="bike")e.elev=Math.round(num($("f-elev").value)||0);}
     if(ex.side){const s=f.querySelector('[data-side][aria-pressed="true"]');e.side=s?s.dataset.side:"Ambos";}
-    if(isCardio(ex.kind)){const ef=esfuerzo(e);if(ef){e.kcal=Math.round(ef.kcal);if(ef.w)e.watts=Math.round(ef.w);}}
+    if(isCardio(ex.kind)){const ef=esfuerzo(e);if(ef){e.kcalEst=Math.round(ef.kcal);if(ef.w)e.wEst=Math.round(ef.w);}
+      const kb=$("f-kcalb")?num($("f-kcalb").value):null,wb=$("f-wb")?num($("f-wb").value):null;if(kb!=null)e.kcalDev=Math.round(kb);if(wb!=null)e.wDev=Math.round(wb);
+      e.kcal=e.kcalDev??e.kcalEst;e.watts=e.wDev??e.wEst;}
     if((e.sets!=null&&e.sets<1)||(isCardio(e.kind)&&e.min<=0)){toast("Revise los valores");return;}
     S.entrenos.push(e);save();toast("Guardado: "+e.name);$("f-note").value="";drawForm();drawDay();drawWeeks();drawProg();};
 }
