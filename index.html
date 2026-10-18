@@ -84,6 +84,16 @@ nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-
 nav.tabs button[aria-selected=true]{color:var(--accent);background:var(--accent-soft)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;z-index:20;max-width:90vw}
 details summary{cursor:pointer;font-weight:600}
+.inds{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.ind{background:var(--bg);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.ind .n{font-size:12px;color:var(--muted);font-weight:600}
+.ind .v{font-family:var(--display);font-size:26px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums}
+.ind .v small{font-family:var(--body);font-size:12px;color:var(--muted);font-weight:500}
+.ind .d{font-size:12px;font-variant-numeric:tabular-nums}
+.ind .d.bad{color:var(--warn)} .ind .d.good{color:var(--ok)}
+.ind .r{font-size:11px;color:var(--muted)}
+.ind.alert{background:var(--warn-soft)} .ind.alert .v{color:var(--warn)}
+.ind svg{width:100%;height:34px;display:block}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -140,21 +150,22 @@ function armDelete(btn,fn){btn.addEventListener("click",()=>{if(btn.dataset.arme
 
 /* ================= Gráfico de líneas (SVG) ================= */
 function lineChart(series,opt={}){
-  const W=640,H=opt.h||220,L=40,R=10,T=14,B=26;
+  const W=400,H=opt.h||250,L=36,R=8,T=14,B=24;
   const all=series.flatMap(s=>s.pts);if(!all.length)return `<div class="empty">Sin datos para graficar.</div>`;
   const xs=all.map(p=>pD(p.x).getTime());let x0=Math.min(...xs),x1=Math.max(...xs);if(x0===x1){x0-=864e5*15;x1+=864e5*15;}
   let y0=Math.min(...all.map(p=>p.y)),y1=Math.max(...all.map(p=>p.y));if(opt.ref!=null){y0=Math.min(y0,opt.ref);y1=Math.max(y1,opt.ref);}
   const padY=(y1-y0)*0.12||1;y0-=padY;y1+=padY;
   const X=t=>L+(W-L-R)*(t-x0)/(x1-x0),Y=v=>T+(H-T-B)*(1-(v-y0)/(y1-y0));
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opt.label||"Gráfico")}">`;
-  for(let i=0;i<=4;i++){const v=y0+(y1-y0)*i/4,y=Y(v);s+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-5}" y="${y+4}" text-anchor="end">${fmt(v,(y1-y0)<8?1:0)}</text>`;}
+  for(let i=0;i<=4;i++){const v=y0+(y1-y0)*i/4,y=Y(v);s+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-5}" y="${y+4}" text-anchor="end">${fmt(v,opt.axDec??((y1-y0)<8?1:0))}</text>`;}
   const yr0=new Date(x0).getFullYear(),yr1=new Date(x1).getFullYear();
   if(yr1>yr0){for(let y=yr0+1;y<=yr1;y++){const t=new Date(y,0,1).getTime();const x=X(t);s+=`<line x1="${x}" x2="${x}" y1="${T}" y2="${H-B}" stroke="var(--line)" stroke-dasharray="3 3"/><text x="${x}" y="${H-8}" text-anchor="middle">${y}</text>`;}}
   else{[x0,(x0+x1)/2,x1].forEach((t,i)=>{s+=`<text x="${X(t)}" y="${H-8}" text-anchor="${["start","middle","end"][i]}">${new Date(t).toLocaleDateString("es-BO",{day:"2-digit",month:"short"})}</text>`;});}
   if(opt.ref!=null){const y=Y(opt.ref);s+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--warn)" stroke-dasharray="5 4"/><text x="${W-R}" y="${y-4}" text-anchor="end" style="fill:var(--warn)">${esc(opt.refLabel||"")}</text>`;}
   series.forEach(se=>{const p=se.pts.slice().sort((a,b)=>a.x.localeCompare(b.x));if(!p.length)return;
     s+=`<polyline fill="none" stroke="${se.color}" stroke-width="2" points="${p.map(q=>X(pD(q.x).getTime())+","+Y(q.y)).join(" ")}"/>`;
-    p.forEach((q,i)=>{s+=`<circle cx="${X(pD(q.x).getTime())}" cy="${Y(q.y)}" r="${i===p.length-1?4.5:3}" fill="${se.color}"><title>${fD(q.x)}: ${fmt(q.y,1)}</title></circle>`;});});
+    p.forEach((q,i)=>{s+=`<circle cx="${X(pD(q.x).getTime())}" cy="${Y(q.y)}" r="${i===p.length-1?4:p.length>40?2:2.6}" fill="${se.color}"><title>${fD(q.x)}: ${fmt(q.y,opt.dec??1)}</title></circle>`;});});
+  if(opt.trend&&series[0].pts.length>2){const p=series[0].pts.slice().sort((a,b)=>a.x.localeCompare(b.x));const sl=slopePerYear(p);if(sl!=null){const t0=pD(p[0].x).getTime();const n=p.length;const xs=p.map(q=>(pD(q.x).getTime()-t0)/31557600000),my=p.reduce((a,q)=>a+q.y,0)/n,mx=xs.reduce((a,b)=>a+b,0)/n;const b0=my-sl*mx;const tA=t0,tB=pD(p[n-1].x).getTime();const yA=b0,yB=b0+sl*(tB-t0)/31557600000;s+=`<line x1="${X(tA)}" y1="${Y(yA)}" x2="${X(tB)}" y2="${Y(yB)}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="6 4" opacity=".55"/>`;}}
   s+=`</svg>`;
   if(series.length>1)s+=`<div class="row" style="gap:14px;font-size:12px">${series.map(se=>`<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${se.color};margin-right:5px"></span>${esc(se.name)}</span>`).join("")}</div>`;
   return s;
@@ -187,6 +198,36 @@ const isCardio=k=>k==="cardio"||k==="bike";
 function weekStart(s){const d=pD(s);d.setDate(d.getDate()-((d.getDay()+6)%7));return iso(d);}
 function agg(list){const r={days:new Set(),sets:0,reps:0,ton:0,cmin:0,km:0,elev:0};list.forEach(e=>{r.days.add(e.date);if(e.kind==="reps"){r.sets+=e.sets;r.reps+=e.sets*e.reps;r.ton+=e.sets*e.reps*(e.kg||0);}else if(e.kind==="time"){r.sets+=e.sets;}else{r.cmin+=e.min||0;if(e.exId.startsWith("bici")){r.km+=e.km||0;r.elev+=e.elev||0;}}});return r;}
 function describe(e){if(e.kind==="reps")return e.sets+"×"+e.reps+(e.kg?" · "+fmt(e.kg,e.kg%1?1:0)+" kg":"")+(e.side&&e.side!=="Ambos"?" · "+e.side:"");if(e.kind==="time")return e.sets+"×"+e.secs+" s";let s=fmt(e.min)+" min";if(e.km)s+=" · "+fmt(e.km,e.km%1?1:0)+" km";if(e.elev)s+=" · +"+fmt(e.elev)+" m";if(e.km&&e.min)s+=" · "+fmt(e.km/(e.min/60),1)+" km/h";return s;}
+
+/* ================= INDICADORES ================= */
+function spark(pts,color,ref){if(pts.length<2)return "";const p=pts.slice().sort((a,b)=>a.x.localeCompare(b.x));const W=150,H=34;const xs=p.map(q=>pD(q.x).getTime());const x0=Math.min(...xs),x1=Math.max(...xs)||x0+1;let y0=Math.min(...p.map(q=>q.y)),y1=Math.max(...p.map(q=>q.y));if(ref!=null&&ref>=y0-(y1-y0)&&ref<=y1+(y1-y0)){y0=Math.min(y0,ref);y1=Math.max(y1,ref);}if(y1===y0){y1+=1;y0-=1;}
+  const X=t=>2+(W-4)*(t-x0)/((x1-x0)||1),Y=v=>3+(H-6)*(1-(v-y0)/(y1-y0));let s=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">`;
+  if(ref!=null&&ref>=y0&&ref<=y1)s+=`<line x1="0" x2="${W}" y1="${Y(ref)}" y2="${Y(ref)}" stroke="var(--warn)" stroke-dasharray="3 3" opacity=".7"/>`;
+  s+=`<polyline fill="none" stroke="${color}" stroke-width="1.8" points="${p.map((q,i)=>X(xs[i])+","+Y(q.y)).join(" ")}"/><circle cx="${X(xs[xs.length-1])}" cy="${Y(p[p.length-1].y)}" r="3" fill="${color}"/></svg>`;return s;}
+function indicators(){
+  const P=S.parametros,F=P.sexo==="F",L=S.laboratorio.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const labS=(fn)=>L.map(r=>({x:r.fecha,y:fn(r)})).filter(p=>p.y!=null&&isFinite(p.y));
+  const wts=S.medidas.filter(r=>r.peso).map(r=>({x:r.fecha,y:r.peso})).concat(S.balanza.map(r=>({x:r.fecha,y:r.peso})));
+  const out=[];
+  // def: [nombre, puntos, decimales, unidad, refTexto, esMalo(v), subirEsMalo, refLinea]
+  if(P.talla)out.push(["IMC",wts.map(p=>({x:p.x,y:p.y/((P.talla/100)**2)})),1,"kg/m²","normal 18,5–24,9 · sobrepeso 25–29,9",v=>v>=25,true,25]);
+  if(P.talla)out.push(["Cintura / talla",S.medidas.filter(r=>r.cintura).map(r=>({x:r.fecha,y:r.cintura/P.talla})),3,"","meta < 0,500",v=>v>=0.5,true,0.5]);
+  out.push(["Masa grasa (balanza)",S.balanza.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*corrB(r)/100})),1,"kg",P.correccionBalanza?"corregida por nivel de actividad":"según la balanza",()=>false,true,null]);
+  out.push(["HOMA-IR",labS(r=>r.glucosa&&r.insulina?r.glucosa*r.insulina/405:null),2,"","resistencia a la insulina si ≥ 2,5",v=>v>=2.5,true,2.5]);
+  out.push(["Glucosa en ayunas",labS(r=>r.glucosa),0,"mg/dL","normal 70–99 · prediabetes 100–125",v=>v>=100,true,100]);
+  out.push(["HbA1c",labS(r=>r.hba1c),1,"%","normal < 5,7 · prediabetes 5,7–6,4",v=>v>=5.7,true,5.7]);
+  out.push(["Triglicéridos / HDL",labS(r=>r.tg&&r.hdl?r.tg/r.hdl:null),2,"","ideal < 2 · > 3 sugiere resistencia a la insulina",v=>v>=2,true,2]);
+  out.push(["LDL",labS(r=>r.ldl),0,"mg/dL","deseable < 130 · óptimo < 100",v=>v>=130,true,130]);
+  out.push(["HDL",labS(r=>r.hdl),0,"mg/dL",F?"deseable ≥ 50":"deseable ≥ 40",v=>v<(F?50:40),false,F?50:40]);
+  out.push(["Colesterol no-HDL",labS(r=>r.colTotal&&r.hdl?r.colTotal-r.hdl:null),0,"mg/dL","deseable < 160 · óptimo < 130",v=>v>=160,true,160]);
+  out.push(["TSH (tiroides)",labS(r=>r.tsh),2,"µUI/mL","rango 0,4–4,5",v=>v>4.5||v<0.4,true,4.5]);
+  out.push(["Filtrado renal",labS(r=>{const e=r.edad||edadEn(r.fecha);return idx(r,e).egfr??null;}),0,"mL/min","normal ≥ 90 · leve 60–89",v=>v<60,false,null]);
+  return out.filter(o=>o[1].length);
+}
+function indTiles(){const c=C();return indicators().map(([n,pts,d,u,rt,bad,upBad,ref])=>{
+  const p=pts.slice().sort((a,b)=>a.x.localeCompare(b.x));const last=p[p.length-1],first=p[0];
+  let dl="";if(p.length>1){const dv=last.y-first.y;const worse=Math.abs(dv)<Math.pow(10,-d)/2?null:(dv>0)===upBad;dl=`<div class="d ${worse===null?"":worse?"bad":"good"}">${dv>0?"▲":dv<0?"▼":"="} ${dv>=0?"+":""}${fmt(dv,d)} desde ${pD(first.x).getFullYear()}</div>`;}
+  return `<div class="ind${bad(last.y)?" alert":""}"><div class="n">${esc(n)}</div><div class="v">${fmt(last.y,d)} <small>${esc(u)}</small></div>${spark(p,bad(last.y)?c.w:c.a,ref)}${dl}<div class="r">${fD(last.x)} · ${esc(rt)}</div></div>`;}).join("");}
 
 /* ================= INICIO ================= */
 function latest(arr,key){const a=arr.filter(r=>r[key]!=null).sort((x,y)=>(x.fecha+(x.hora||"")).localeCompare(y.fecha+(y.hora||"")));return a[a.length-1];}
@@ -237,6 +278,8 @@ function vInicio(m){
   if(sF!=null&&bpts.length>3)msgs.push(`Grasa (balanza${P.correccionBalanza?", corregida":""}): ${sF>=0?"+":""}${fmt(sF,1)} kg/año · masa libre de grasa: ${sM>=0?"+":""}${fmt(sM,1)} kg/año.`);
   if(labMonths>12)msgs.push(`Hace ${labMonths} meses que no se hace análisis de laboratorio.`+(S.pendientes?" Pendientes: "+S.pendientes:""));
   else if(S.pendientes)msgs.push("Hace "+labMonths+" meses del último análisis. Pendientes: "+S.pendientes);
+  const tiles=indTiles();
+  if(tiles)h+=`<div class="panel"><h2>Indicadores</h2><p class="hint">Último valor, evolución y cambio desde la primera medición. En rojo, fuera del rango recomendado; la línea punteada marca el límite.</p><div class="inds">${tiles}</div></div>`;
   if(msgs.length)h+=`<div class="panel"><h2>Para tener en cuenta</h2>${msgs.map(t=>`<div class="note${t.startsWith("Hace")?" w":""}">${esc(t)}</div>`).join("")}</div>`;
   h+=`<div class="panel"><h2>Peso y cintura</h2><div class="chart" id="ch1"></div></div>`;
   m.innerHTML=h;
@@ -305,7 +348,7 @@ function drawDay(){$("d-title").textContent=entDate===today()?"Hoy":fDay(entDate
   const a=agg(list);$("d-sum").textContent=[a.sets?a.sets+" series":"",a.cmin?fmt(a.cmin)+" min cardio":""].filter(Boolean).join(" · ");}
 function drawWeeks(){const ws=[];let d=pD(weekStart(today()));for(let i=0;i<12;i++){ws.unshift(iso(d));d.setDate(d.getDate()-7);}
   const A=ws.map(w=>agg(S.entrenos.filter(e=>weekStart(e.date)===w)));const c=C();
-  const W=640,H=180,L=30,B=24,T=12,bw=(W-L-8)/12,mx=Math.max(4,...A.map(a=>a.sets));
+  const W=400,H=170,L=26,B=22,T=12,bw=(W-L-8)/12,mx=Math.max(4,...A.map(a=>a.sets));
   let s=`<svg viewBox="0 0 ${W} ${H}">`;[0,.5,1].forEach(f=>{const y=T+(H-T-B)*(1-f);s+=`<line x1="${L}" x2="${W-8}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-4}" y="${y+4}" text-anchor="end">${Math.round(mx*f)}</text>`;});
   A.forEach((a,i)=>{const h=(H-T-B)*a.sets/mx,x=L+i*bw+bw*.2;s+=`<rect x="${x}" y="${H-B-h}" width="${bw*.6}" height="${h}" rx="3" fill="${c.a}" opacity="${i===11?1:.6}"/>`;if(a.sets)s+=`<text x="${x+bw*.3}" y="${H-B-h-4}" text-anchor="middle">${a.sets}</text>`;if(i%3===2)s+=`<text x="${x+bw*.3}" y="${H-7}" text-anchor="middle">${pD(ws[i]).toLocaleDateString("es-BO",{day:"2-digit",month:"short"})}</text>`;});
   $("ch-w").innerHTML=s+"</svg>";
@@ -359,11 +402,21 @@ function vBalanza(m){
   <div class="fields"><div class="field"><label class="lbl" for="b-date">Fecha</label><input type="date" id="b-date" value="${today()}"></div><div class="field"><label class="lbl" for="b-hora">Hora</label><input type="time" id="b-hora" value="${pad(new Date().getHours())}:${pad(new Date().getMinutes())}"></div>
   ${[["peso","Peso kg"],["grasa","Grasa %"],["agua","Agua %"],["musculo","Músculo %"],["hueso","Huesos kg"],["bmr","Metab. basal kcal"],["amr","Metab. activo kcal"]].map(([k,l])=>`<div class="field"><label class="lbl" for="b-${k}">${l}</label><input id="b-${k}" inputmode="decimal"></div>`).join("")}</div>
   <p class="hint">Copie los valores de la app de su balanza. Pésese siempre a la misma hora, en ayunas y con los pies secos. Los metabolismos basal y activo son opcionales: permiten detectar si cambió el nivel de actividad configurado en la balanza.</p><div class="row"><button class="btn" id="b-save">Guardar pesada</button></div></div>
-  <div class="panel"><h2>Peso y grasa corregida</h2><div class="chart" id="b-ch"></div><div class="hint" id="b-tr"></div></div>
+  <div class="panel"><div class="row between"><h2>Evolución</h2><select id="b-var" style="width:auto"></select></div><div class="chart" id="b-ch"></div><div class="hint" id="b-tr2"></div><div class="hint" id="b-tr"></div></div>
   <div class="panel"><h2>Pesadas</h2><div class="tbl"><table id="b-t"></table></div></div>`;
   $("b-save").onclick=()=>{const r={fecha:$("b-date").value||today(),hora:$("b-hora").value||"00:00"};["peso","grasa","agua","musculo","hueso","bmr","amr"].forEach(k=>{const v=num($("b-"+k).value);if(v!=null)r[k]=v;});if(r.peso==null){toast("Ingrese al menos el peso");return;}S.balanza.push(r);save();toast("Pesada guardada");vBalanza(m);};
   const c=C();const fk=rows.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*corr(r)/100})),ff=rows.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*(1-corr(r)/100)}));
-  $("b-ch").innerHTML=lineChart([{name:"Peso (kg)",color:c.a,pts:rows.map(r=>({x:r.fecha,y:r.peso}))},{name:"Masa grasa"+(P.correccionBalanza?" corregida":"")+" (kg)",color:c.w,pts:fk}],{label:"Balanza"});
+  const BV=[["peso","Peso (kg)",r=>r.peso,1],["imc","IMC (kg/m²)",r=>P.talla?r.peso/((P.talla/100)**2):null,1,25,"sobrepeso"],["grasa","Grasa (%)"+(P.correccionBalanza?" corregida":""),r=>corr(r),1],["fkg","Masa grasa (kg)"+(P.correccionBalanza?" corregida":""),r=>r.grasa!=null?r.peso*corr(r)/100:null,1],["ffm","Masa libre de grasa (kg)",r=>r.grasa!=null?r.peso*(1-corr(r)/100):null,1],["musculo","Músculo (%)",r=>r.musculo,1],["mkg","Músculo (kg)",r=>r.musculo!=null?r.peso*r.musculo/100:null,1],["agua","Agua (%)",r=>r.agua,1],["hueso","Huesos (kg)",r=>r.hueso,1],["bmr","Metabolismo basal (kcal)",r=>r.bmr,0],["amr","Metabolismo activo (kcal)",r=>r.amr,0]]
+    .filter(v=>rows.some(r=>{const y=v[2](r);return y!=null&&isFinite(y);}));
+  const sel=$("b-var");sel.innerHTML=BV.map(v=>`<option value="${v[0]}">${v[1]}</option>`).join("");
+  let lastV=null;try{lastV=localStorage.getItem(KEY+"-bvar");}catch(e){}if(lastV&&BV.some(v=>v[0]===lastV))sel.value=lastV;
+  const drawB=()=>{const v=BV.find(x=>x[0]===sel.value);if(!v){$("b-ch").innerHTML=`<div class="empty">Sin pesadas todavía.</div>`;return;}
+    const pts=rows.map(r=>({x:r.fecha,y:v[2](r)})).filter(p=>p.y!=null&&isFinite(p.y));
+    $("b-ch").innerHTML=lineChart([{name:v[1],color:c.a,pts}],{label:v[1],trend:true,dec:v[3],axDec:v[3],ref:v[4],refLabel:v[5]});
+    const sl=slopePerYear(pts.slice().sort((a,b)=>a.x.localeCompare(b.x)));
+    $("b-tr2").textContent=pts.length>1?`${pts.length} pesadas · primera ${fmt(pts[0].y,v[3])} → última ${fmt(pts[pts.length-1].y,v[3])} · tendencia (línea punteada) ${sl>=0?"+":""}${fmt(sl,v[3]||1)} por año.`:"";
+    try{localStorage.setItem(KEY+"-bvar",v[0]);}catch(e){}};
+  sel.onchange=drawB;drawB();
   const s1=slopePerYear(fk),s2=slopePerYear(ff);$("b-tr").textContent=s1!=null?`Tendencia: grasa ${s1>=0?"+":""}${fmt(s1,1)} kg/año · masa libre de grasa ${s2>=0?"+":""}${fmt(s2,1)} kg/año${P.correccionBalanza?` (corrección de ${fmt(P.correccionBalanza,1)} puntos a pesadas con factor de actividad 1,50)`:""}.`:"";
   $("b-t").innerHTML=`<thead><tr><th>Fecha</th><th>Hora</th><th>Peso</th><th>Grasa %</th>${P.correccionBalanza?"<th>Grasa corr.</th>":""}<th>Músculo %</th><th>Agua %</th><th>Factor</th><th></th></tr></thead><tbody>${rows.slice().reverse().map((r,i)=>`<tr><td>${fD(r.fecha)}</td><td>${esc(r.hora||"")}</td><td>${fmt(r.peso,1)}</td><td>${r.grasa!=null?fmt(r.grasa,1):""}</td>${P.correccionBalanza?`<td>${r.grasa!=null?fmt(corr(r),1):""}</td>`:""}<td>${r.musculo!=null?fmt(r.musculo,1):""}</td><td>${r.agua!=null?fmt(r.agua,1):""}</td><td>${r.amr&&r.bmr?fmt(r.amr/r.bmr,2):""}</td><td><button class="del" data-k="${r.fecha}|${r.hora}|${r.peso}">Borrar</button></td></tr>`).join("")}</tbody>`;
   m.querySelectorAll("#b-t .del").forEach(b=>armDelete(b,()=>{const [f,h,p]=b.dataset.k.split("|");const i=S.balanza.findIndex(x=>x.fecha===f&&(x.hora||"")===h&&String(x.peso)===p);if(i>=0)S.balanza.splice(i,1);save();vBalanza(m);}));
