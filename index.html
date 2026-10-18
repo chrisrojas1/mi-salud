@@ -111,9 +111,10 @@ details summary{cursor:pointer;font-weight:600}
 "use strict";
 /* ================= Almacenamiento (solo en este teléfono) ================= */
 const KEY="mi-salud-v1";
-const EMPTY=()=>({app:"salud-christian",version:1,parametros:{talla:174,cuelloRef:43,correccionBeurer:1.7,sexo:"M"},medidas:[],balanza:[],laboratorio:[],eventos:[],entrenos:[],ejerciciosPropios:[]});
+const EMPTY=()=>({app:"mi-salud",version:2,pendientes:"",parametros:{nombre:"",sexo:"",talla:null,nacimiento:"",cuelloRef:null,correccionBalanza:0},medidas:[],balanza:[],laboratorio:[],eventos:[],entrenos:[],ejerciciosPropios:[]});
 let S=EMPTY();
-function load(){try{const t=localStorage.getItem(KEY);if(t){S=Object.assign(EMPTY(),JSON.parse(t));}}catch(e){toast("No se pudieron leer los datos guardados");}}
+function migrate(d){const o=Object.assign(EMPTY(),d);o.parametros=Object.assign(EMPTY().parametros,d.parametros||{});const p=o.parametros;if(p.correccionBeurer!=null&&!p.correccionBalanza){p.correccionBalanza=p.correccionBeurer;}delete p.correccionBeurer;if(!p.sexo&&d.app==="salud-christian")p.sexo="M";return o;}
+function load(){try{const t=localStorage.getItem(KEY);if(t){S=migrate(JSON.parse(t));}}catch(e){toast("No se pudieron leer los datos guardados");}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));localStorage.setItem(KEY+"-ts",new Date().toISOString());}catch(e){toast("No se pudo guardar: memoria del navegador llena");}}
 if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(()=>{});}
 
@@ -131,7 +132,10 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const years=(a,b)=>(pD(b)-pD(a))/31557600000;
 function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2400);}
 function slopePerYear(pts){if(pts.length<2)return null;const x0=pD(pts[0].x);const xs=pts.map(p=>(pD(p.x)-x0)/31557600000),ys=pts.map(p=>p.y);const n=xs.length,mx=xs.reduce((a,b)=>a+b)/n,my=ys.reduce((a,b)=>a+b)/n;let sxy=0,sxx=0;xs.forEach((x,i)=>{sxy+=(x-mx)*(ys[i]-my);sxx+=(x-mx)**2;});return sxx?sxy/sxx:null;}
-function navy(cintura,cuello,talla){if(!cintura||!cuello||!talla||cintura<=cuello)return null;return 495/(1.0324-0.19077*Math.log10(cintura-cuello)+0.15456*Math.log10(talla))-450;}
+function navy(cintura,cuello,talla,cadera){if(!cintura||!cuello||!talla)return null;if(S.parametros.sexo==="F"){if(!cadera||cintura+cadera<=cuello)return null;return 495/(1.29579-0.35004*Math.log10(cintura+cadera-cuello)+0.22100*Math.log10(talla))-450;}if(cintura<=cuello)return null;return 495/(1.0324-0.19077*Math.log10(cintura-cuello)+0.15456*Math.log10(talla))-450;}
+function corrB(r){const P=S.parametros;return r.grasa!=null?r.grasa+(P.correccionBalanza&&r.amr&&r.bmr&&r.amr/r.bmr>1.45?P.correccionBalanza:0):null;}
+function edadEn(f){const n=S.parametros.nacimiento;return n?Math.floor(years(n,f)):null;}
+function lastCadera(){const r=latest(S.medidas,"cadera");return r?r.cadera:null;}
 function armDelete(btn,fn){btn.addEventListener("click",()=>{if(btn.dataset.armed){fn();}else{btn.dataset.armed="1";btn.textContent="¿Borrar?";btn.style.color="var(--warn)";setTimeout(()=>{if(btn.isConnected){delete btn.dataset.armed;btn.textContent="Borrar";btn.style.color="";}},3000);}});}
 
 /* ================= Gráfico de líneas (SVG) ================= */
@@ -187,14 +191,30 @@ function latest(arr,key){const a=arr.filter(r=>r[key]!=null).sort((x,y)=>(x.fech
 function vInicio(m){
   $("title").textContent="Mi Salud";$("subtitle").textContent="Resumen al "+fDay(today());
   const P=S.parametros;
+  if(P.nombre)$("subtitle").textContent=P.nombre+" · "+fDay(today());
+  if(!P.talla||!P.sexo){
+    m.innerHTML=`<div class="panel"><h2>Bienvenido</h2><p>Esta app registra entrenamiento, medidas corporales, pesadas y análisis de laboratorio. Todo se guarda solo en este teléfono, sin cuentas ni internet: nadie más puede ver sus datos.</p>
+    <p class="hint">Para empezar, complete sus datos básicos. Sirven para calcular cintura/talla, % de grasa y los rangos de laboratorio.</p>
+    <div class="fields"><div class="field"><label class="lbl" for="s-nom">Nombre (opcional)</label><input id="s-nom" value="${esc(P.nombre)}"></div>
+    <div class="field"><span class="lbl">Sexo</span><div class="chips" id="s-sexo"><button type="button" class="chip" data-x="M" aria-pressed="${P.sexo==="M"}">Hombre</button><button type="button" class="chip" data-x="F" aria-pressed="${P.sexo==="F"}">Mujer</button></div></div>
+    <div class="field"><label class="lbl" for="s-talla">Talla (cm)</label><input id="s-talla" inputmode="decimal" value="${P.talla||""}" placeholder="Ej.: 170"></div>
+    <div class="field"><label class="lbl" for="s-nac">Fecha de nacimiento</label><input type="date" id="s-nac" value="${P.nacimiento||""}"></div></div>
+    <div class="row"><button class="btn" id="s-ok">Empezar</button></div>
+    <p class="hint">¿Ya tiene un respaldo de esta app? <button class="btn ghost sm" id="b-imp">Cargar respaldo</button></p></div>`;
+    let sx=P.sexo;$("s-sexo").querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{sx=b.dataset.x;$("s-sexo").querySelectorAll("[data-x]").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false"));});
+    $("b-imp").onclick=()=>$("file-in").click();
+    $("s-ok").onclick=()=>{const t=num($("s-talla").value);if(!sx){toast("Elija hombre o mujer");return;}if(!t||t<100||t>230){toast("Ingrese la talla en cm");return;}P.nombre=$("s-nom").value.trim();P.sexo=sx;P.talla=t;P.nacimiento=$("s-nac").value||"";save();toast("Listo");vInicio(m);};
+    return;}
   if(!S.medidas.length&&!S.balanza.length&&!S.laboratorio.length&&!S.entrenos.length){
-    m.innerHTML=`<div class="panel"><h2>Bienvenido</h2><p>Esta app guarda todo en este teléfono, sin internet. Para cargar su historial (medidas desde 2022, balanza, análisis de laboratorio y eventos), toque <b>Cargar respaldo</b> y elija el archivo <b>salud-respaldo.json</b>.</p><div class="row"><button class="btn" id="b-imp">Cargar respaldo</button><button class="btn ghost" id="b-new">Empezar vacío</button></div></div>`;
-    $("b-imp").onclick=()=>$("file-in").click();$("b-new").onclick=()=>go("entreno");return;}
+    m.innerHTML=`<div class="panel"><h2>Primeros pasos</h2><p>Todavía no hay registros. Puede empezar por cualquiera de estas secciones:</p>
+    <div class="row"><button class="btn" data-g="entreno">Registrar un entreno</button><button class="btn ghost" data-g="cuerpo">Anotar medidas</button><button class="btn ghost" data-g="balanza">Anotar una pesada</button></div>
+    <p class="hint">Consejo: mida cintura, cuello y cadera con cinta métrica una vez al mes, por la mañana y en ayunas.</p></div>`;
+    m.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>go(b.dataset.g));return;}
   const lp=latest(S.balanza,"peso"),lm=latest(S.medidas,"cintura");
   const peso=lp&&(!lm||lp.fecha>=lm.fecha||!lm.peso)?{v:lp.peso,f:lp.fecha}:(lm&&lm.peso?{v:lm.peso,f:lm.fecha}:null);
   const whtr=lm?lm.cintura/P.talla:null;
-  const lmN=latest(S.medidas,"cintura");const bf=lmN?navy(lmN.cintura,lmN.cuello||P.cuelloRef,P.talla):null;
-  const lb=latest(S.balanza,"grasa");const bfB=lb?lb.grasa+(lb.amr/lb.bmr>1.45?P.correccionBeurer:0):null;
+  const lmN=latest(S.medidas,"cintura");const bf=lmN?navy(lmN.cintura,lmN.cuello||P.cuelloRef,P.talla,lmN.cadera||lastCadera()):null;
+  const lb=latest(S.balanza,"grasa");const bfB=lb?corrB(lb):null;
   const wk=agg(S.entrenos.filter(e=>weekStart(e.date)===weekStart(today())));
   const ll=S.laboratorio.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha)).pop();
   const labMonths=ll?Math.floor(years(ll.fecha,today())*12):null;
@@ -202,18 +222,19 @@ function vInicio(m){
     ["Peso",peso?fmt(peso.v,1)+" kg":"—",peso?fD(peso.f):"",false],
     ["Cintura",lm?fmt(lm.cintura,1)+" cm":"—",lm?"meta ≤ "+Math.round(P.talla*0.5)+" cm":"",lm&&lm.cintura>Math.round(P.talla*0.5)],
     ["Cintura / talla",whtr?fmt(whtr,3):"—","meta < 0,500",whtr>0.5],
-    ["% grasa (cinta, Navy)",bf?fmt(bf,1)+" %":"—","con cuello "+(lmN&&lmN.cuello?"medido":"de referencia"),false],
-    ["% grasa (balanza, corregida)",bfB?fmt(bfB,1)+" %":"—",lb?fD(lb.fecha):"",false],
+    ["% grasa (cinta, Navy)",bf?fmt(bf,1)+" %":"—",bf?"con cuello "+(lmN&&lmN.cuello?"medido":"de referencia"):(P.sexo==="F"?"mida cintura, cuello y cadera":"mida cintura y cuello"),false],
+    ["% grasa (balanza"+(P.correccionBalanza?", corregida":"")+")",bfB?fmt(bfB,1)+" %":"—",lb?fD(lb.fecha):"",false],
     ["Esta semana",wk.sets+" series",fmt(wk.cmin)+" min cardio · "+fmt(wk.km,1)+" km bici",false],
     ["Último análisis",ll?fD(ll.fecha):"—",labMonths!=null?"hace "+labMonths+" meses":"",labMonths>12]];
   let h=`<div class="panel"><h2>Hoy</h2><div class="stats">${cards.map(c=>`<div class="stat${c[3]?" alert":""}"><span>${c[0]}</span><b>${c[1]}</b><span>${esc(c[2])}</span></div>`).join("")}</div></div>`;
   // tendencia grasa balanza
-  const bpts=S.balanza.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*(r.grasa+(r.amr/r.bmr>1.45?P.correccionBeurer:0))/100}));
-  const ffm=S.balanza.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*(1-(r.grasa+(r.amr/r.bmr>1.45?P.correccionBeurer:0))/100)}));
+  const bpts=S.balanza.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*corrB(r)/100}));
+  const ffm=S.balanza.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*(1-corrB(r)/100)}));
   const sF=slopePerYear(bpts),sM=slopePerYear(ffm);
   const msgs=[];
-  if(sF!=null)msgs.push(`Grasa (balanza, corregida): ${sF>=0?"+":""}${fmt(sF,1)} kg/año · masa libre de grasa: ${sM>=0?"+":""}${fmt(sM,1)} kg/año.`);
-  if(labMonths>12)msgs.push(`Hace ${labMonths} meses que no se hace análisis. Pendientes: HbA1c, glucosa e insulina, perfil lipídico + ApoB + Lp(a), TSH, T4 libre, anti-TPO, GOT/GPT/GGT, creatinina, B12, hemograma, orina y ecografía abdominal.`);
+  if(sF!=null&&bpts.length>3)msgs.push(`Grasa (balanza${P.correccionBalanza?", corregida":""}): ${sF>=0?"+":""}${fmt(sF,1)} kg/año · masa libre de grasa: ${sM>=0?"+":""}${fmt(sM,1)} kg/año.`);
+  if(labMonths>12)msgs.push(`Hace ${labMonths} meses que no se hace análisis de laboratorio.`+(S.pendientes?" Pendientes: "+S.pendientes:""));
+  else if(S.pendientes)msgs.push("Hace "+labMonths+" meses del último análisis. Pendientes: "+S.pendientes);
   if(msgs.length)h+=`<div class="panel"><h2>Para tener en cuenta</h2>${msgs.map(t=>`<div class="note${t.startsWith("Hace")?" w":""}">${esc(t)}</div>`).join("")}</div>`;
   h+=`<div class="panel"><h2>Peso y cintura</h2><div class="chart" id="ch1"></div></div>`;
   m.innerHTML=h;
@@ -298,10 +319,10 @@ function vCuerpo(m){
   const draw=()=>{const v=$("m-var").value,c=C();let pts=[],ser=[],opt={};
     const pairAvg=(a,b)=>rows.filter(r=>r[a]!=null&&r[b]!=null).map(r=>({x:r.fecha,y:(r[a]+r[b])/2}));
     if(v==="whtr"){pts=rows.filter(r=>r.cintura).map(r=>({x:r.fecha,y:r.cintura/P.talla}));opt={ref:.5,refLabel:"meta 0,50"};}
-    else if(v==="navy"){pts=rows.filter(r=>r.cintura).map(r=>({x:r.fecha,y:navy(r.cintura,r.cuello||P.cuelloRef,P.talla)}));}
+    else if(v==="navy"){pts=rows.filter(r=>r.cintura).map(r=>({x:r.fecha,y:navy(r.cintura,r.cuello||P.cuelloRef,P.talla,r.cadera||lastCadera())})).filter(p=>p.y!=null);}
     else if(v==="bic")ser=[{name:"Promedio",color:c.a,pts:pairAvg("bicepI","bicepD")}];
     else if(v==="mus")ser=[{name:"Izq",color:c.a,pts:rows.filter(r=>r.musloI).map(r=>({x:r.fecha,y:r.musloI}))},{name:"Der",color:c.c,pts:rows.filter(r=>r.musloD).map(r=>({x:r.fecha,y:r.musloD}))}];
-    else if(v==="pie")ser=[{name:"Izq (Aquiles 2020)",color:c.w,pts:rows.filter(r=>r.piernaI).map(r=>({x:r.fecha,y:r.piernaI}))},{name:"Der",color:c.c,pts:rows.filter(r=>r.piernaD).map(r=>({x:r.fecha,y:r.piernaD}))}];
+    else if(v==="pie")ser=[{name:"Izq",color:c.w,pts:rows.filter(r=>r.piernaI).map(r=>({x:r.fecha,y:r.piernaI}))},{name:"Der",color:c.c,pts:rows.filter(r=>r.piernaD).map(r=>({x:r.fecha,y:r.piernaD}))}];
     else if(v==="rod")ser=[{name:"Izq",color:c.a,pts:rows.filter(r=>r.rodI).map(r=>({x:r.fecha,y:r.rodI}))},{name:"Der",color:c.c,pts:rows.filter(r=>r.rodD).map(r=>({x:r.fecha,y:r.rodD}))}];
     else{pts=rows.filter(r=>r[v]!=null).map(r=>({x:r.fecha,y:r[v]}));if(v==="cintura")opt={ref:Math.round(P.talla*.5),refLabel:"meta"};}
     if(!ser.length)ser=[{name:v,color:v==="cintura"?c.w:c.a,pts}];
@@ -315,47 +336,49 @@ function vCuerpo(m){
 
 /* ================= BALANZA ================= */
 function vBalanza(m){
-  $("title").textContent="Balanza";$("subtitle").textContent="Beurer BF 710 · use el peso; la grasa sale casi solo del peso";
+  $("title").textContent="Balanza";$("subtitle").textContent="Balanza de bioimpedancia · confíe más en el peso que en el % de grasa";
   const P=S.parametros,rows=S.balanza.slice().sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
-  const corr=r=>r.grasa!=null?r.grasa+(r.amr&&r.bmr&&r.amr/r.bmr>1.45?P.correccionBeurer:0):null;
+  const corr=corrB;
   m.innerHTML=`<div class="panel"><div class="row between"><h2>Nueva pesada</h2></div>
   <div class="fields"><div class="field"><label class="lbl" for="b-date">Fecha</label><input type="date" id="b-date" value="${today()}"></div><div class="field"><label class="lbl" for="b-hora">Hora</label><input type="time" id="b-hora" value="${pad(new Date().getHours())}:${pad(new Date().getMinutes())}"></div>
   ${[["peso","Peso kg"],["grasa","Grasa %"],["agua","Agua %"],["musculo","Músculo %"],["hueso","Huesos kg"],["bmr","Metab. basal kcal"],["amr","Metab. activo kcal"]].map(([k,l])=>`<div class="field"><label class="lbl" for="b-${k}">${l}</label><input id="b-${k}" inputmode="decimal"></div>`).join("")}</div>
-  <p class="hint">Copie los valores de la app de Beurer. Los metabolismos permiten detectar si cambió el nivel de actividad del perfil.</p><div class="row"><button class="btn" id="b-save">Guardar pesada</button></div></div>
+  <p class="hint">Copie los valores de la app de su balanza. Pésese siempre a la misma hora, en ayunas y con los pies secos. Los metabolismos basal y activo son opcionales: permiten detectar si cambió el nivel de actividad configurado en la balanza.</p><div class="row"><button class="btn" id="b-save">Guardar pesada</button></div></div>
   <div class="panel"><h2>Peso y grasa corregida</h2><div class="chart" id="b-ch"></div><div class="hint" id="b-tr"></div></div>
   <div class="panel"><h2>Pesadas</h2><div class="tbl"><table id="b-t"></table></div></div>`;
   $("b-save").onclick=()=>{const r={fecha:$("b-date").value||today(),hora:$("b-hora").value||"00:00"};["peso","grasa","agua","musculo","hueso","bmr","amr"].forEach(k=>{const v=num($("b-"+k).value);if(v!=null)r[k]=v;});if(r.peso==null){toast("Ingrese al menos el peso");return;}S.balanza.push(r);save();toast("Pesada guardada");vBalanza(m);};
   const c=C();const fk=rows.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*corr(r)/100})),ff=rows.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*(1-corr(r)/100)}));
-  $("b-ch").innerHTML=lineChart([{name:"Peso (kg)",color:c.a,pts:rows.map(r=>({x:r.fecha,y:r.peso}))},{name:"Masa grasa corregida (kg)",color:c.w,pts:fk}],{label:"Balanza"});
-  const s1=slopePerYear(fk),s2=slopePerYear(ff);$("b-tr").textContent=s1!=null?`Tendencia: grasa ${s1>=0?"+":""}${fmt(s1,1)} kg/año · masa libre de grasa ${s2>=0?"+":""}${fmt(s2,1)} kg/año (corrección de ${fmt(P.correccionBeurer,1)} puntos a pesadas con factor 1,50).`:"";
-  $("b-t").innerHTML=`<thead><tr><th>Fecha</th><th>Hora</th><th>Peso</th><th>Grasa %</th><th>Grasa corr.</th><th>Músculo %</th><th>Agua %</th><th>Factor</th><th></th></tr></thead><tbody>${rows.slice().reverse().map((r,i)=>`<tr><td>${fD(r.fecha)}</td><td>${esc(r.hora||"")}</td><td>${fmt(r.peso,1)}</td><td>${r.grasa!=null?fmt(r.grasa,1):""}</td><td>${r.grasa!=null?fmt(corr(r),1):""}</td><td>${r.musculo!=null?fmt(r.musculo,1):""}</td><td>${r.agua!=null?fmt(r.agua,1):""}</td><td>${r.amr&&r.bmr?fmt(r.amr/r.bmr,2):""}</td><td><button class="del" data-k="${r.fecha}|${r.hora}|${r.peso}">Borrar</button></td></tr>`).join("")}</tbody>`;
+  $("b-ch").innerHTML=lineChart([{name:"Peso (kg)",color:c.a,pts:rows.map(r=>({x:r.fecha,y:r.peso}))},{name:"Masa grasa"+(P.correccionBalanza?" corregida":"")+" (kg)",color:c.w,pts:fk}],{label:"Balanza"});
+  const s1=slopePerYear(fk),s2=slopePerYear(ff);$("b-tr").textContent=s1!=null?`Tendencia: grasa ${s1>=0?"+":""}${fmt(s1,1)} kg/año · masa libre de grasa ${s2>=0?"+":""}${fmt(s2,1)} kg/año${P.correccionBalanza?` (corrección de ${fmt(P.correccionBalanza,1)} puntos a pesadas con factor de actividad 1,50)`:""}.`:"";
+  $("b-t").innerHTML=`<thead><tr><th>Fecha</th><th>Hora</th><th>Peso</th><th>Grasa %</th>${P.correccionBalanza?"<th>Grasa corr.</th>":""}<th>Músculo %</th><th>Agua %</th><th>Factor</th><th></th></tr></thead><tbody>${rows.slice().reverse().map((r,i)=>`<tr><td>${fD(r.fecha)}</td><td>${esc(r.hora||"")}</td><td>${fmt(r.peso,1)}</td><td>${r.grasa!=null?fmt(r.grasa,1):""}</td>${P.correccionBalanza?`<td>${r.grasa!=null?fmt(corr(r),1):""}</td>`:""}<td>${r.musculo!=null?fmt(r.musculo,1):""}</td><td>${r.agua!=null?fmt(r.agua,1):""}</td><td>${r.amr&&r.bmr?fmt(r.amr/r.bmr,2):""}</td><td><button class="del" data-k="${r.fecha}|${r.hora}|${r.peso}">Borrar</button></td></tr>`).join("")}</tbody>`;
   m.querySelectorAll("#b-t .del").forEach(b=>armDelete(b,()=>{const [f,h,p]=b.dataset.k.split("|");const i=S.balanza.findIndex(x=>x.fecha===f&&(x.hora||"")===h&&String(x.peso)===p);if(i>=0)S.balanza.splice(i,1);save();vBalanza(m);}));
 }
 
 /* ================= LABORATORIO ================= */
 const LF=[["glucosa","Glucosa ayunas","mg/dL",70,99],["insulina","Insulina basal","µUI/mL",2,10],["hba1c","HbA1c","%",null,5.6],["colTotal","Colesterol total","mg/dL",null,199],["hdl","HDL","mg/dL",40,null],["ldl","LDL","mg/dL",null,129],["vldl","VLDL","mg/dL",null,30],["tg","Triglicéridos","mg/dL",null,149],["apob","ApoB","mg/dL",null,100],["lpa","Lp(a)","mg/dL",null,50],["tsh","TSH","µUI/mL",0.4,4.5],["t4l","T4 libre","ng/dL",0.8,1.8],["t3","T3 total","ng/mL",0.69,2.15],["antiTPO","Anti-TPO","UI/mL",null,35],["got","GOT (AST)","U/L",null,40],["gpt","GPT (ALT)","U/L",null,41],["ggt","GGT","U/L",null,60],["creatinina","Creatinina","mg/dL",0.7,1.3],["acUrico","Ácido úrico","mg/dL",3.5,7.2],["b12","Vitamina B12","pg/mL",200,900],["hb","Hemoglobina","g/dL",13.5,18],["leucocitos","Leucocitos","10³/µL",4,10],["plaquetas","Plaquetas","10³/µL",150,400],["ves","VES 1 h","mm/h",null,20],["psa","PSA total","ng/mL",null,4],["glucosa60","Glucosa 60 min","mg/dL",null,180],["insulina60","Insulina 60 min","µUI/mL",null,null],["proteinas","Proteínas totales","g/dL",6.2,7.9],["psaRatio","PSA libre/total","",0.16,1]];
-function idx(r,edad){const o={};if(r.glucosa&&r.insulina)o.homa=r.glucosa*r.insulina/405;if(r.tg&&r.hdl)o.tghdl=r.tg/r.hdl;if(r.colTotal&&r.hdl)o.nohdl=r.colTotal-r.hdl;if(r.gpt&&r.got)o.gptgot=r.gpt/r.got;if(r.creatinina&&edad){const s=r.creatinina/0.9;o.egfr=142*Math.min(s,1)**-0.302*Math.max(s,1)**-1.2*0.9938**edad;}return o;}
+function LFs(){const F=S.parametros.sexo==="F";return LF.map(x=>{const y=x.slice();if(F){if(y[0]==="hdl")y[3]=50;if(y[0]==="hb"){y[3]=12;y[4]=16;}if(y[0]==="creatinina"){y[3]=0.5;y[4]=1.1;}if(y[0]==="acUrico"){y[3]=2.6;y[4]=6;}if(y[0]==="ggt")y[4]=40;}return y;});}
+function idx(r,edad){const o={};if(r.glucosa&&r.insulina)o.homa=r.glucosa*r.insulina/405;if(r.tg&&r.hdl)o.tghdl=r.tg/r.hdl;if(r.colTotal&&r.hdl)o.nohdl=r.colTotal-r.hdl;if(r.gpt&&r.got)o.gptgot=r.gpt/r.got;if(r.creatinina&&edad){if(S.parametros.sexo==="F"){const s=r.creatinina/0.7;o.egfr=142*Math.min(s,1)**-0.241*Math.max(s,1)**-1.2*0.9938**edad*1.012;}else{const s=r.creatinina/0.9;o.egfr=142*Math.min(s,1)**-0.302*Math.max(s,1)**-1.2*0.9938**edad;}}return o;}
 const IF_=[["homa","HOMA-IR",null,2.5,2],["tghdl","TG / HDL",null,2,2],["nohdl","Colesterol no-HDL",null,159,0],["gptgot","GPT / GOT",null,1,2],["egfr","Filtrado renal (CKD-EPI)",90,null,0]];
 function vLab(m){
   $("title").textContent="Análisis";$("subtitle").textContent="Laboratorio: valores, índices y alertas";
   const rows=S.laboratorio.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  const usedLF=LF.filter(([k])=>rows.some(r=>r[k]!=null));
+  const usedLF=LFs().filter(([k])=>rows.some(r=>r[k]!=null));
   const out=(v,mn,mx)=>v!=null&&((mn!=null&&v<mn)||(mx!=null&&v>mx));
   let t=`<thead><tr><th>Analito</th><th>Ref.</th>${rows.map(r=>`<th>${fD(r.fecha)}</th>`).join("")}</tr></thead><tbody>`;
   usedLF.forEach(([k,l,u,mn,mx])=>{t+=`<tr><td>${l}</td><td>${mn!=null?mn:""}${mn!=null&&mx!=null?"–":""}${mx!=null?(mn==null?"≤":"")+mx:(mn!=null?"+":"")}</td>${rows.map(r=>{const ex=r.excluidos&&r.excluidos[k]!=null;const v=r[k];return ex?`<td class="ex" title="${esc(r.excluidos.motivo)}">${fmt(r.excluidos[k],1)}</td>`:`<td class="${out(v,mn,mx)?"hi":""}">${v!=null?fmt(v,v%1?(v<10?2:1):0):""}</td>`;}).join("")}</tr>`;});
   t+=`<tr><td colspan="${rows.length+2}" class="lbl" style="padding-top:12px">Índices calculados</td></tr>`;
-  IF_.forEach(([k,l,mn,mx,d])=>{t+=`<tr><td>${l}</td><td>${mn!=null?"≥"+mn:"≤"+mx}</td>${rows.map(r=>{const v=idx(r,r.edad||(S.parametros.nacimiento?Math.floor(years(S.parametros.nacimiento,r.fecha)):null))[k];return `<td class="${out(v,mn,mx)?"hi":""}">${v!=null?fmt(v,d):""}</td>`;}).join("")}</tr>`;});
+  IF_.forEach(([k,l,mn,mx,d])=>{t+=`<tr><td>${l}</td><td>${mn!=null?"≥"+mn:"≤"+mx}</td>${rows.map(r=>{const v=idx(r,r.edad||edadEn(r.fecha))[k];return `<td class="${out(v,mn,mx)?"hi":""}">${v!=null?fmt(v,d):""}</td>`;}).join("")}</tr>`;});
   t+="</tbody>";
-  m.innerHTML=`<div class="panel"><h2>Resultados</h2><p class="hint">En rojo, fuera de rango. Tachado: excluido (muestra después de corticoide). Deslice la tabla hacia los lados.</p><div class="tbl"><table>${t}</table></div></div>
+  m.innerHTML=`<div class="panel"><h2>Resultados</h2><p class="hint">En rojo, fuera de rango (rangos clínicos generales; los de su laboratorio pueden variar). Tachado: valor excluido. Deslice la tabla hacia los lados.</p>${rows.length?`<div class="tbl"><table>${t}</table></div>`:`<div class="empty">Todavía no hay análisis. Use "Agregar análisis nuevo" más abajo.</div>`}</div>
   <div class="panel"><div class="row between"><h2>Evolución</h2><select id="l-var" style="width:auto">${usedLF.map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}<option value="homa">HOMA-IR</option><option value="tghdl">TG / HDL</option></select></div><div class="chart" id="l-ch"></div></div>
   <div class="panel"><details><summary>Agregar análisis nuevo</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
-  <div class="fields"><div class="field"><label class="lbl" for="l-date">Fecha</label><input type="date" id="l-date" value="${today()}"></div><div class="field"><label class="lbl" for="l-lab">Laboratorio</label><input id="l-lab"></div><div class="field"><label class="lbl" for="l-edad">Edad</label><input id="l-edad" inputmode="numeric" value="${S.parametros.edad||48}"></div></div>
+  <div class="fields"><div class="field"><label class="lbl" for="l-date">Fecha</label><input type="date" id="l-date" value="${today()}"></div><div class="field"><label class="lbl" for="l-lab">Laboratorio</label><input id="l-lab"></div><div class="field"><label class="lbl" for="l-edad">Edad</label><input id="l-edad" inputmode="numeric" value="${edadEn(today())??""}"></div></div>
   <div class="fields">${LF.slice(0,25).map(([k,l,u])=>`<div class="field"><label class="lbl" for="l-${k}">${l} <span style="text-transform:none">${u}</span></label><input id="l-${k}" inputmode="decimal"></div>`).join("")}</div>
   <div class="field"><label class="lbl" for="l-ctx">Contexto (ayuno, medicamentos, enfermedad reciente)</label><input id="l-ctx"></div>
   <div class="row"><button class="btn" id="l-save">Guardar análisis</button></div></div></details></div>
-  <div class="panel"><h2>Pendiente</h2><div class="note w">HbA1c, glucosa e insulina en ayunas, perfil lipídico + ApoB + Lp(a), TSH, T4 libre, anti-TPO, GOT/GPT/GGT, creatinina, vitamina B12, hemograma, orina y ecografía abdominal. 12 h de ayuno, 48 h sin entrenar, 72 h sin alcohol y 2–3 semanas sin corticoides ni enfermedad.</div></div>`;
-  const draw=()=>{const k=$("l-var").value,c=C();const def=LF.find(x=>x[0]===k)||IF_.find(x=>x[0]===k);
-    const pts=rows.map(r=>({x:r.fecha,y:k==="homa"||k==="tghdl"?idx(r,r.edad)[k]:r[k]})).filter(p=>p.y!=null);
+  <div class="panel"><h2>Pendientes</h2><p class="hint">Análisis o estudios por hacer. Aparecen también en Inicio.</p><textarea id="l-pend" rows="3" placeholder="Ej.: HbA1c, perfil lipídico, TSH…">${esc(S.pendientes||"")}</textarea><div class="row"><button class="btn sm" id="l-pend-ok">Guardar pendientes</button></div></div>`;
+  $("l-pend-ok").onclick=()=>{S.pendientes=$("l-pend").value.trim();save();toast("Pendientes guardados");};
+  const draw=()=>{const k=$("l-var").value,c=C();const def=LFs().find(x=>x[0]===k)||IF_.find(x=>x[0]===k);
+    const pts=rows.map(r=>({x:r.fecha,y:k==="homa"||k==="tghdl"?idx(r,r.edad||edadEn(r.fecha))[k]:r[k]})).filter(p=>p.y!=null);
     const ref=def?(def[0]==="homa"||def[0]==="tghdl"?def[3]:(def[4]!=null?def[4]:def[3])):null;
     $("l-ch").innerHTML=lineChart([{name:k,color:c.a,pts}],{ref,refLabel:"límite"});};
   if(usedLF.length){$("l-var").onchange=draw;draw();}
@@ -372,19 +395,19 @@ function vDatos(m){
   <div class="hint">Último cambio: ${ts?new Date(ts).toLocaleString("es-BO"):"—"}</div>
   <div class="row"><button class="btn" id="d-exp">Descargar respaldo</button><button class="btn ghost" id="d-csv">Entrenos en CSV</button><button class="btn ghost" id="d-imp">Cargar respaldo</button></div>
   <p class="hint">Cargar un respaldo reemplaza los datos actuales de este teléfono.</p></div>
-  <div class="panel"><h2>Eventos</h2><ul class="list" id="ev"></ul><div class="fields"><div class="field"><label class="lbl" for="ev-f">Fecha</label><input id="ev-f" placeholder="2026-11 o 2026-11-05"></div><div class="field" style="grid-column:span 2"><label class="lbl" for="ev-t">Evento</label><input id="ev-t" placeholder="Ej.: inicia levotiroxina 25 µg"></div></div><div class="row"><button class="btn sm" id="ev-add">Agregar evento</button></div></div>
-  <div class="panel"><h2>Parámetros</h2><div class="fields"><div class="field"><label class="lbl" for="p-talla">Talla (cm)</label><input id="p-talla" inputmode="decimal" value="${P.talla}"></div><div class="field"><label class="lbl" for="p-cuello">Cuello de referencia (cm)</label><input id="p-cuello" inputmode="decimal" value="${P.cuelloRef}"></div><div class="field"><label class="lbl" for="p-corr">Corrección Beurer (puntos)</label><input id="p-corr" inputmode="decimal" value="${P.correccionBeurer}"></div></div><div class="row"><button class="btn sm" id="p-save">Guardar parámetros</button></div></div>
+  <div class="panel"><h2>Eventos</h2><ul class="list" id="ev"></ul><div class="fields"><div class="field"><label class="lbl" for="ev-f">Fecha</label><input id="ev-f" placeholder="2026-11 o 2026-11-05"></div><div class="field" style="grid-column:span 2"><label class="lbl" for="ev-t">Evento</label><input id="ev-t" placeholder="Ej.: empiezo a entrenar 3 veces por semana"></div></div><div class="row"><button class="btn sm" id="ev-add">Agregar evento</button></div></div>
+  <div class="panel"><h2>Mis datos</h2><div class="fields"><div class="field"><label class="lbl" for="p-nom">Nombre</label><input id="p-nom" value="${esc(P.nombre||"")}"></div><div class="field"><label class="lbl" for="p-sexo">Sexo</label><select id="p-sexo"><option value="M"${P.sexo==="M"?" selected":""}>Hombre</option><option value="F"${P.sexo==="F"?" selected":""}>Mujer</option></select></div><div class="field"><label class="lbl" for="p-talla">Talla (cm)</label><input id="p-talla" inputmode="decimal" value="${P.talla||""}"></div><div class="field"><label class="lbl" for="p-nac">Nacimiento</label><input type="date" id="p-nac" value="${P.nacimiento||""}"></div><div class="field"><label class="lbl" for="p-cuello">Cuello de referencia (cm)</label><input id="p-cuello" inputmode="decimal" value="${P.cuelloRef||""}" placeholder="si no mide el cuello"></div><div class="field"><label class="lbl" for="p-corr">Corrección de balanza (puntos de grasa)</label><input id="p-corr" inputmode="decimal" value="${P.correccionBalanza||0}"></div></div><p class="hint">Deje la corrección de balanza en 0, salvo que haya cambiado el nivel de actividad configurado en su balanza y quiera comparar pesadas de antes y después.</p><div class="row"><button class="btn sm" id="p-save">Guardar mis datos</button></div></div>
   <div class="panel"><h2>Borrar todo</h2><p class="hint">Elimina todos los datos de este teléfono. Descargue antes un respaldo.</p><div class="row"><button class="btn warn sm" id="d-wipe">Borrar todos los datos</button></div></div>`;
   const ev=$("ev");S.eventos.slice().sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))).forEach((e,i)=>{const li=document.createElement("li");li.innerHTML=`<div><b>${esc(e.fecha)}</b><div>${esc(e.texto)}</div></div><button class="del">Borrar</button>`;armDelete(li.querySelector(".del"),()=>{S.eventos=S.eventos.filter(x=>x!==e);save();vDatos(m);});ev.appendChild(li);});
   $("ev-add").onclick=()=>{const f=$("ev-f").value.trim(),t=$("ev-t").value.trim();if(!f||!t){toast("Complete fecha y evento");return;}S.eventos.push({fecha:f,texto:t});save();vDatos(m);};
-  $("p-save").onclick=()=>{P.talla=num($("p-talla").value)||P.talla;P.cuelloRef=num($("p-cuello").value)||P.cuelloRef;const c=num($("p-corr").value);if(c!=null)P.correccionBeurer=c;save();toast("Parámetros guardados");};
-  $("d-exp").onclick=()=>download("salud-respaldo-"+today()+".json",JSON.stringify(Object.assign({},S,{exportado:new Date().toISOString()}),null,1),"application/json");
+  $("p-save").onclick=()=>{P.nombre=$("p-nom").value.trim();P.sexo=$("p-sexo").value;P.talla=num($("p-talla").value)||P.talla;P.nacimiento=$("p-nac").value||"";P.cuelloRef=num($("p-cuello").value);const c=num($("p-corr").value);P.correccionBalanza=c||0;save();toast("Datos guardados");};
+  $("d-exp").onclick=()=>download("salud-respaldo-"+(S.parametros.nombre?S.parametros.nombre.toLowerCase().replace(/[^a-z0-9]+/g,"-")+"-":"")+today()+".json",JSON.stringify(Object.assign({},S,{exportado:new Date().toISOString()}),null,1),"application/json");
   $("d-csv").onclick=()=>{if(!S.entrenos.length){toast("No hay entrenos");return;}const cols=["date","name","group","kind","side","sets","reps","kg","secs","min","km","elev","note"];const q=v=>{v=v==null?"":String(v);return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};download("entrenos-"+today()+".csv","﻿"+["Fecha","Ejercicio","Grupo","Tipo","Lado","Series","Reps","Kg","Segundos","Minutos","Km","Desnivel_m","Nota"].join(";")+"\n"+S.entrenos.slice().sort((a,b)=>(a.date+a.ts).localeCompare(b.date+b.ts)).map(e=>cols.map(c=>q(e[c])).join(";")).join("\n"),"text/csv");};
   $("d-imp").onclick=()=>$("file-in").click();
   const w=$("d-wipe");w.onclick=()=>{if(w.dataset.armed){S=EMPTY();save();toast("Datos borrados");go("inicio");}else{w.dataset.armed="1";w.textContent="Toque de nuevo para confirmar";setTimeout(()=>{if(w.isConnected){delete w.dataset.armed;w.textContent="Borrar todos los datos";}},4000);}};
 }
 function download(name,text,type){const b=new Blob([text],{type});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);toast("Descargado: "+name);}
-$("file-in").addEventListener("change",ev=>{const f=ev.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d||!Array.isArray(d.medidas)||!Array.isArray(d.balanza))throw 0;S=Object.assign(EMPTY(),d);delete S.exportado;save();toast("Respaldo cargado: "+S.medidas.length+" mediciones, "+S.balanza.length+" pesadas, "+S.laboratorio.length+" análisis");go("inicio");}catch(e){toast("Ese archivo no es un respaldo válido de esta app");}ev.target.value="";};rd.readAsText(f);});
+$("file-in").addEventListener("change",ev=>{const f=ev.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d||!Array.isArray(d.medidas)||!Array.isArray(d.balanza))throw 0;S=migrate(d);delete S.exportado;save();toast("Respaldo cargado: "+S.medidas.length+" mediciones, "+S.balanza.length+" pesadas, "+S.laboratorio.length+" análisis");go("inicio");}catch(e){toast("Ese archivo no es un respaldo válido de esta app");}ev.target.value="";};rd.readAsText(f);});
 
 /* ================= Arranque ================= */
 load();
