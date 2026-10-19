@@ -219,6 +219,7 @@ function indicators(){
   if(P.talla)out.push(["IMC",wts.map(p=>({x:p.x,y:p.y/((P.talla/100)**2)})),1,"kg/m²","normal 18,5–24,9 · sobrepeso 25–29,9",v=>v>=25,true,25]);
   if(P.talla)out.push(["Cintura / talla",S.medidas.filter(r=>r.cintura).map(r=>({x:r.fecha,y:r.cintura/P.talla})),3,"","meta < 0,500",v=>v>=0.5,true,0.5]);
   out.push(["Masa grasa (balanza)",S.balanza.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*corrB(r)/100})),1,"kg",P.correccionBalanza?"corregida por nivel de actividad":"según la balanza",()=>false,true,null]);
+  {const R_=bikeRides().filter(r=>r.p20m);if(R_.length)out.push(["Bici: mejor 20 min",R_.map(r=>({x:r.date,y:r.p20m/r._kg})),2,"W/kg","potencia sostenida relativa al peso",()=>false,false,null]);}
   out.push(["HOMA-IR",labS(r=>r.glucosa&&r.insulina?r.glucosa*r.insulina/405:null),2,"","resistencia a la insulina si ≥ 2,5",v=>v>=2.5,true,2.5]);
   out.push(["Glucosa en ayunas",labS(r=>r.glucosa),0,"mg/dL","normal 70–99 · prediabetes 100–125",v=>v>=100,true,100]);
   out.push(["HbA1c",labS(r=>r.hba1c),1,"%","normal < 5,7 · prediabetes 5,7–6,4",v=>v>=5.7,true,5.7]);
@@ -302,9 +303,10 @@ function vEntreno(m){
   m.innerHTML=`<div class="panel"><div class="row between"><h2>Registrar</h2><input type="date" id="e-date" value="${entDate}" style="width:165px"></div><div id="cat" style="display:flex;flex-direction:column;gap:10px"></div><div id="eform"></div></div>
   <div class="panel"><div class="row between"><h2 id="d-title"></h2><span class="hint" id="d-sum"></span></div><ul class="list" id="d-list"></ul></div>
   <div class="panel"><h2>Series de fuerza por semana</h2><p class="hint">Referencia para ganar músculo: 10–20 series semanales por grupo muscular.</p><div class="chart" id="ch-w"></div><div class="tbl"><table id="t-w"></table></div></div>
-  <div class="panel"><h2>Progreso por ejercicio</h2><div class="tbl"><table id="t-p"></table></div></div>`;
+  <div class="panel"><h2>Progreso por ejercicio</h2><div class="tbl"><table id="t-p"></table></div></div>
+  <div class="panel" id="bk-panel"><div class="row between"><h2>Progreso en bicicleta</h2><select id="bk-var" style="width:auto"></select></div><div class="stats" id="bk-stats"></div><div class="chart" id="bk-ch"></div><div class="hint" id="bk-tr"></div><h2 style="font-size:17px">Por mes</h2><div class="tbl"><table id="bk-t"></table></div></div>`;
   $("e-date").onchange=e=>{entDate=e.target.value||today();drawDay();};
-  drawCat();drawForm();drawDay();drawWeeks();drawProg();
+  drawCat();drawForm();drawDay();drawWeeks();drawProg();drawBike();
 }
 function drawCat(){const box=$("cat");box.innerHTML="";
   const top=document.createElement("div");top.className="row between";
@@ -335,7 +337,8 @@ function drawForm(){const f=$("eform");if(!selEx){f.innerHTML=`<p class="hint">T
   else if(ex.kind==="time"){h+=stepper("f-sets","Series",L?L.sets:3,1,1)+stepper("f-secs","Segundos por serie",L?L.secs:45,5,5);}
   else{h+=stepper("f-min","Tiempo (min)",L?L.min:30,5,1)+stepper("f-km","Distancia (km)",L?L.km:(ex.kind==="bike"?15:3),0.5,0,1);if(ex.kind==="bike")h+=stepper("f-elev","Desnivel + (m)",L?L.elev:150,10,0);}
   h+=`</div>`;
-  if(ex.kind==="bike")h+=`<div class="fields"><div class="field"><label class="lbl" for="f-kcalb">Kcal que marca la bici</label><input id="f-kcalb" inputmode="numeric" placeholder="opcional"></div><div class="field"><label class="lbl" for="f-wb">Vatios promedio (W)</label><input id="f-wb" inputmode="numeric" placeholder="opcional"></div></div>`;
+  if(ex.kind==="bike")h+=`<div class="fields"><div class="field"><label class="lbl" for="f-kcalb">Kcal que marca la bici</label><input id="f-kcalb" inputmode="numeric" placeholder="opcional"></div><div class="field"><label class="lbl" for="f-wb">Vatios promedio (W)</label><input id="f-wb" inputmode="numeric" placeholder="opcional"></div></div>
+  <details><summary class="hint">Más datos de la sesión (opcional)</summary><div class="fields" style="margin-top:8px">${[["f-wmax","Vatios máximos"],["f-np","Potencia normalizada (NP)"],["f-cad","Cadencia media (rpm)"],["f-fc","Frecuencia cardíaca media"],["f-tss","TSS"],["f-p20","Mejor 20 min (W)"]].map(([i,l])=>`<div class="field"><label class="lbl" for="${i}">${l}</label><input id="${i}" inputmode="numeric"></div>`).join("")}<div class="field" style="grid-column:1/-1"><label class="lbl" for="f-ruta">Ruta</label><input id="f-ruta" placeholder="Ej.: Lago di Garda"></div></div></details>`;
   if(isCardio(ex.kind))h+=`<div class="prev" id="f-ef" style="background:var(--cardio-soft)"></div>`;
   if(ex.side)h+=`<div class="field"><span class="lbl">Lado</span><div class="chips" id="f-side">${["Ambos","Izq","Der"].map(s=>`<button type="button" class="chip" data-side="${s}" aria-pressed="${((L&&L.side)||"Ambos")===s}">${s}</button>`).join("")}</div></div>`;
   h+=`<div class="field"><label class="lbl" for="f-note">Nota</label><input id="f-note" placeholder="Opcional: al fallo, molestia…"></div><div class="row"><button class="btn" id="f-save">Guardar</button></div>`;
@@ -354,7 +357,8 @@ function drawForm(){const f=$("eform");if(!selEx){f.innerHTML=`<p class="hint">T
     if(ex.side){const s=f.querySelector('[data-side][aria-pressed="true"]');e.side=s?s.dataset.side:"Ambos";}
     if(isCardio(ex.kind)){const ef=esfuerzo(e);if(ef){e.kcalEst=Math.round(ef.kcal);if(ef.w)e.wEst=Math.round(ef.w);}
       const kb=$("f-kcalb")?num($("f-kcalb").value):null,wb=$("f-wb")?num($("f-wb").value):null;if(kb!=null)e.kcalDev=Math.round(kb);if(wb!=null)e.wDev=Math.round(wb);
-      e.kcal=e.kcalDev??e.kcalEst;e.watts=e.wDev??e.wEst;}
+      e.kcal=e.kcalDev??e.kcalEst;e.watts=e.wDev??e.wEst;
+      [["f-wmax","wMax"],["f-np","np"],["f-cad","cad"],["f-fc","fc"],["f-tss","tss"],["f-p20","p20m"]].forEach(([i,k])=>{const el=$(i);if(el){const v=num(el.value);if(v!=null)e[k]=v;}});const rt=$("f-ruta");if(rt&&rt.value.trim())e.ruta=rt.value.trim();}
     if((e.sets!=null&&e.sets<1)||(isCardio(e.kind)&&e.min<=0)){toast("Revise los valores");return;}
     S.entrenos.push(e);save();toast("Guardado: "+e.name);$("f-note").value="";drawForm();drawDay();drawWeeks();drawProg();};
 }
@@ -377,6 +381,24 @@ function drawProg(){const ids=[...new Set(S.entrenos.map(e=>e.exId))];const t=$(
     return `<tr><td>${esc(l.name)}</td><td>${esc(describe(l))}</td><td>${fD(l.date)}</td><td>${best}</td><td>${isCardio(l.kind)?"—":L.filter(e=>e.date>=cs).reduce((s,e)=>s+(e.sets||0),0)}</td></tr>`;}).join("")}</tbody>`;}
 function addExercise(){const f=$("eform");f.innerHTML=`<div class="fields"><div class="field"><label class="lbl" for="n-name">Nombre</label><input id="n-name"></div><div class="field"><label class="lbl" for="n-g">Grupo</label><select id="n-g">${GROUPS.map(g=>`<option>${g}</option>`).join("")}</select></div><div class="field"><label class="lbl" for="n-k">Se mide en</label><select id="n-k"><option value="reps">Series × reps</option><option value="time">Series × segundos</option><option value="cardio">Tiempo y distancia</option><option value="bike">Tiempo, distancia y desnivel</option></select></div></div><div class="row"><button class="btn" id="n-ok">Agregar ejercicio</button><button class="btn ghost" id="n-x">Cancelar</button></div>`;
   $("n-x").onclick=drawForm;$("n-ok").onclick=()=>{const n=$("n-name").value.trim();if(!n){toast("Escriba un nombre");return;}const e={id:"c"+Date.now().toString(36),name:n,group:$("n-g").value,kind:$("n-k").value};S.ejerciciosPropios.push(e);save();selEx=e.id;drawCat();drawForm();};}
+
+/* ================= PROGRESO EN BICICLETA ================= */
+function bikeRides(){return S.entrenos.filter(e=>(e.kind==="bike"||String(e.exId).startsWith("bici"))&&(e.min||0)>=10).map(e=>{const kg=pesoEn(e.date);const w=e.wDev??e.watts;return Object.assign({},e,{_kg:kg,_w:w,_wkg:w?w/kg:null,_npkg:e.np?e.np/kg:null,_p20kg:e.p20m?e.p20m/kg:null,_kmh:e.km&&e.min?e.km/(e.min/60):null,_kcalmin:e.kcal&&e.min?e.kcal/e.min:null,_elevkm:e.km?(e.elev||0)/e.km:null});}).sort((a,b)=>(a.date+a.ts).localeCompare(b.date+b.ts));}
+function drawBike(){const pnl=$("bk-panel");if(!pnl)return;const R_=bikeRides();if(!R_.length){pnl.hidden=true;return;}pnl.hidden=false;
+  const V=[["_w","Potencia media (W)",0],["np","Potencia normalizada (W)",0],["_wkg","Potencia media (W/kg)",2],["p20m","Mejor 20 min (W)",0],["_p20kg","Mejor 20 min (W/kg)",2],["kcal","Kcal",0],["_kcalmin","Kcal por minuto",1],["min","Tiempo (min)",0],["km","Distancia (km)",1],["elev","Desnivel (m)",0],["_elevkm","Desnivel por km (m/km)",1],["_kmh","Velocidad media (km/h)",1],["cad","Cadencia media (rpm)",0],["tss","TSS",0],["_kg","Peso del día (kg)",1]].filter(v=>R_.some(r=>r[v[0]]!=null));
+  const sel=$("bk-var");sel.innerHTML=V.map(v=>`<option value="${v[0]}">${v[1]}</option>`).join("");let lv=null;try{lv=localStorage.getItem(KEY+"-bkvar");}catch(e){}if(lv&&V.some(v=>v[0]===lv))sel.value=lv;
+  const tot=R_.reduce((a,r)=>({km:a.km+(r.km||0),min:a.min+(r.min||0),elev:a.elev+(r.elev||0),kcal:a.kcal+(r.kcal||0)}),{km:0,min:0,elev:0,kcal:0});
+  const cut=iso(new Date(Date.now()-90*864e5));const p20r=R_.filter(r=>r.p20m&&r.date>=cut).map(r=>r.p20m),p20a=R_.filter(r=>r.p20m).map(r=>r.p20m);
+  const ftpR=p20r.length?0.95*Math.max(...p20r):null,ftpA=p20a.length?0.95*Math.max(...p20a):null,kgNow=pesoEn(today());
+  $("bk-stats").innerHTML=[["Sesiones",R_.length,""],["Distancia total",fmt(tot.km)+" km",""],["Tiempo total",fmt(tot.min/60,1)+" h",""],["Desnivel total",fmt(tot.elev)+" m",""],["Kcal totales",fmt(tot.kcal),""],["FTP estimado (90 días)",ftpR?fmt(ftpR)+" W":"—",ftpR?fmt(ftpR/kgNow,2)+" W/kg":"necesita mejor 20 min"],["FTP máximo histórico",ftpA?fmt(ftpA)+" W":"—",""]].map(c=>`<div class="stat"><span>${c[0]}</span><b>${c[1]}</b><span>${c[2]}</span></div>`).join("");
+  const draw=()=>{const v=V.find(x=>x[0]===sel.value);const pts=R_.filter(r=>r[v[0]]!=null).map(r=>({x:r.date,y:r[v[0]]}));const c=C();
+    $("bk-ch").innerHTML=lineChart([{name:v[1],color:c.c,pts}],{label:v[1],trend:true,dec:v[2],axDec:v[2]});const sl=slopePerYear(pts);
+    $("bk-tr").textContent=pts.length>1?`${pts.length} sesiones · tendencia (línea punteada) ${sl>=0?"+":""}${fmt(sl,v[2]||1)} por año.`:"";try{localStorage.setItem(KEY+"-bkvar",v[0]);}catch(e){}};
+  sel.onchange=draw;draw();
+  const by={};R_.forEach(r=>{const k=r.date.slice(0,7);(by[k]=by[k]||[]).push(r);});
+  const avg=(a,k)=>{const x=a.filter(r=>r[k]!=null).map(r=>r[k]);return x.length?x.reduce((p,q)=>p+q,0)/x.length:null;};
+  $("bk-t").innerHTML=`<thead><tr><th>Mes</th><th>Ses.</th><th>Km</th><th>Min</th><th>Desnivel</th><th>W med</th><th>NP</th><th>W/kg</th><th>Mejor 20'</th><th>Kcal</th><th>Peso</th></tr></thead><tbody>${Object.keys(by).sort().reverse().map(k=>{const a=by[k];const sum=f=>a.reduce((p,r)=>p+(r[f]||0),0);const b20=Math.max(0,...a.map(r=>r.p20m||0));
+    return `<tr><td>${pD(k+"-01").toLocaleDateString("es-BO",{month:"short",year:"2-digit"})}</td><td>${a.length}</td><td>${fmt(sum("km"))}</td><td>${fmt(sum("min"))}</td><td>${fmt(sum("elev"))}</td><td>${fmt(avg(a,"_w"))}</td><td>${fmt(avg(a,"np"))}</td><td>${fmt(avg(a,"_wkg"),2)}</td><td>${b20?fmt(b20):"—"}</td><td>${fmt(sum("kcal"))}</td><td>${fmt(avg(a,"_kg"),1)}</td></tr>`;}).join("")}</tbody>`;}
 
 /* ================= MEDIDAS ================= */
 const MF=[["peso","Peso","kg"],["cintura","Cintura","cm"],["pecho","Pecho","cm"],["bicepI","Bícep izq","cm"],["bicepD","Bícep der","cm"],["antI","Antebrazo izq","cm"],["antD","Antebrazo der","cm"],["musloI","Muslo izq","cm"],["musloD","Muslo der","cm"],["piernaI","Pantorrilla izq","cm"],["piernaD","Pantorrilla der","cm"],["rodI","Sobre rótula izq","cm"],["rodD","Sobre rótula der","cm"],["cuello","Cuello","cm"],["cadera","Cadera","cm"]];
@@ -478,8 +500,8 @@ function vDatos(m){
   m.innerHTML=`<div class="panel"><h2>Respaldo</h2><p>Todo vive solo en este teléfono, dentro del navegador. Descargue un respaldo cada semana y guárdelo en Drive o envíeselo por correo: si borra los datos del navegador o cambia de teléfono, el respaldo es lo único que lo recupera.</p>
   <div class="stats"><div class="stat"><b>${S.medidas.length}</b><span>mediciones</span></div><div class="stat"><b>${S.balanza.length}</b><span>pesadas</span></div><div class="stat"><b>${S.laboratorio.length}</b><span>análisis</span></div><div class="stat"><b>${S.entrenos.length}</b><span>registros de entreno</span></div></div>
   <div class="hint">Último cambio: ${ts?new Date(ts).toLocaleString("es-BO"):"—"}</div>
-  <div class="row"><button class="btn" id="d-exp">Descargar respaldo</button><button class="btn ghost" id="d-csv">Entrenos en CSV</button><button class="btn ghost" id="d-imp">Cargar respaldo</button></div>
-  <p class="hint">Cargar un respaldo reemplaza los datos actuales de este teléfono.</p></div>
+  <div class="row"><button class="btn" id="d-exp">Descargar respaldo</button><button class="btn ghost" id="d-csv">Entrenos en CSV</button><button class="btn ghost" id="d-imp">Cargar respaldo</button><button class="btn ghost" id="d-merge">Agregar desde archivo</button></div>
+  <p class="hint"><b>Cargar respaldo</b> reemplaza todo lo de este teléfono. <b>Agregar desde archivo</b> suma lo nuevo de un archivo (entrenos, medidas, pesadas, análisis) sin borrar ni duplicar lo que ya tiene.</p></div>
   <div class="panel"><h2>Eventos</h2><ul class="list" id="ev"></ul><div class="fields"><div class="field"><label class="lbl" for="ev-f">Fecha</label><input id="ev-f" placeholder="2026-11 o 2026-11-05"></div><div class="field" style="grid-column:span 2"><label class="lbl" for="ev-t">Evento</label><input id="ev-t" placeholder="Ej.: empiezo a entrenar 3 veces por semana"></div></div><div class="row"><button class="btn sm" id="ev-add">Agregar evento</button></div></div>
   <div class="panel"><h2>Mis datos</h2><div class="fields"><div class="field"><label class="lbl" for="p-nom">Nombre</label><input id="p-nom" value="${esc(P.nombre||"")}"></div><div class="field"><label class="lbl" for="p-sexo">Sexo</label><select id="p-sexo"><option value="M"${P.sexo==="M"?" selected":""}>Hombre</option><option value="F"${P.sexo==="F"?" selected":""}>Mujer</option></select></div><div class="field"><label class="lbl" for="p-talla">Talla (cm)</label><input id="p-talla" inputmode="decimal" value="${P.talla||""}"></div><div class="field"><label class="lbl" for="p-nac">Nacimiento</label><input type="date" id="p-nac" value="${P.nacimiento||""}"></div><div class="field"><label class="lbl" for="p-cuello">Cuello de referencia (cm)</label><input id="p-cuello" inputmode="decimal" value="${P.cuelloRef||""}" placeholder="si no mide el cuello"></div><div class="field"><label class="lbl" for="p-alt">Altitud donde entrena (m)</label><input id="p-alt" inputmode="numeric" value="${P.altitud||""}" placeholder="Ej.: 2560"></div><div class="field"><label class="lbl" for="p-corr">Corrección de balanza (puntos de grasa)</label><input id="p-corr" inputmode="decimal" value="${P.correccionBalanza||0}"></div></div><p class="hint">Deje la corrección de balanza en 0, salvo que haya cambiado el nivel de actividad configurado en su balanza y quiera comparar pesadas de antes y después.</p><div class="row"><button class="btn sm" id="p-save">Guardar mis datos</button></div></div>
   <div class="panel"><h2>Borrar todo</h2><p class="hint">Elimina todos los datos de este teléfono. Descargue antes un respaldo.</p><div class="row"><button class="btn warn sm" id="d-wipe">Borrar todos los datos</button></div></div>`;
@@ -488,11 +510,17 @@ function vDatos(m){
   $("p-save").onclick=()=>{P.nombre=$("p-nom").value.trim();P.sexo=$("p-sexo").value;P.talla=num($("p-talla").value)||P.talla;P.nacimiento=$("p-nac").value||"";P.cuelloRef=num($("p-cuello").value);const c=num($("p-corr").value);P.correccionBalanza=c||0;P.altitud=num($("p-alt").value)||0;save();toast("Datos guardados");};
   $("d-exp").onclick=()=>download("salud-respaldo-"+(S.parametros.nombre?S.parametros.nombre.toLowerCase().replace(/[^a-z0-9]+/g,"-")+"-":"")+today()+".json",JSON.stringify(Object.assign({},S,{exportado:new Date().toISOString()}),null,1),"application/json");
   $("d-csv").onclick=()=>{if(!S.entrenos.length){toast("No hay entrenos");return;}const cols=["date","name","group","kind","side","sets","reps","kg","secs","min","km","elev","note"];const q=v=>{v=v==null?"":String(v);return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};download("entrenos-"+today()+".csv","﻿"+["Fecha","Ejercicio","Grupo","Tipo","Lado","Series","Reps","Kg","Segundos","Minutos","Km","Desnivel_m","Nota"].join(";")+"\n"+S.entrenos.slice().sort((a,b)=>(a.date+a.ts).localeCompare(b.date+b.ts)).map(e=>cols.map(c=>q(e[c])).join(";")).join("\n"),"text/csv");};
-  $("d-imp").onclick=()=>$("file-in").click();
+  $("d-imp").onclick=()=>{importMode="replace";$("file-in").click();};$("d-merge").onclick=()=>{importMode="merge";$("file-in").click();};
   const w=$("d-wipe");w.onclick=()=>{if(w.dataset.armed){S=EMPTY();save();toast("Datos borrados");go("inicio");}else{w.dataset.armed="1";w.textContent="Toque de nuevo para confirmar";setTimeout(()=>{if(w.isConnected){delete w.dataset.armed;w.textContent="Borrar todos los datos";}},4000);}};
 }
 function download(name,text,type){const b=new Blob([text],{type});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);toast("Descargado: "+name);}
-$("file-in").addEventListener("change",ev=>{const f=ev.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d||!Array.isArray(d.medidas)||!Array.isArray(d.balanza))throw 0;S=migrate(d);delete S.exportado;save();toast("Respaldo cargado: "+S.medidas.length+" mediciones, "+S.balanza.length+" pesadas, "+S.laboratorio.length+" análisis");go("inicio");}catch(e){toast("Ese archivo no es un respaldo válido de esta app");}ev.target.value="";};rd.readAsText(f);});
+let importMode="replace";
+function mergeData(d){const keys={medidas:r=>r.fecha,balanza:r=>r.fecha+"|"+(r.hora||"")+"|"+r.peso,laboratorio:r=>r.fecha,eventos:r=>r.fecha+"|"+r.texto,entrenos:r=>r.id,ejerciciosPropios:r=>r.id};let n=0;
+  Object.entries(keys).forEach(([k,fn])=>{const have=new Set((S[k]||[]).map(fn));(d[k]||[]).forEach(r=>{if(!have.has(fn(r))){S[k].push(r);have.add(fn(r));n++;}});});
+  if(!S.pendientes&&d.pendientes)S.pendientes=d.pendientes;const P=S.parametros,Q=(d.parametros||{});["talla","sexo","nacimiento","altitud","cuelloRef","nombre"].forEach(k=>{if(!P[k]&&Q[k])P[k]=Q[k];});return n;}
+$("file-in").addEventListener("change",ev=>{const f=ev.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d||!Array.isArray(d.medidas)||!Array.isArray(d.balanza))throw 0;
+  if(importMode==="merge"){const n=mergeData(migrate(d));importMode="replace";save();toast(n?"Agregados "+n+" registros nuevos":"No había registros nuevos en el archivo");go(view);ev.target.value="";return;}
+  S=migrate(d);delete S.exportado;save();toast("Respaldo cargado: "+S.medidas.length+" mediciones, "+S.balanza.length+" pesadas, "+S.laboratorio.length+" análisis");go("inicio");}catch(e){toast("Ese archivo no es un respaldo válido de esta app");}ev.target.value="";};rd.readAsText(f);});
 
 /* ================= Arranque ================= */
 load();
