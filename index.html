@@ -202,9 +202,62 @@ function esfuerzo(e,kgCuerpo){const isBike=e.kind==="bike"||String(e.exId).start
   if(!isBike){if(!km)return null;const kcal=kg*km*(0.75+0)+kg*9.81*elev/(4184*0.25);return {kcal,w:null,wkg:null};}
   const m=kg+10,g=9.81,d=km*1000,t=min*60,v=d/t,alt=S.parametros.altitud||0,rho=1.225*Math.exp(-alt/8500),CdA=0.40,Crr=0.005;
   const J=Crr*m*g*d+0.5*rho*CdA*v*v*d+m*g*elev;const w=J/t;return {kcal:J/0.22/4184,w,wkg:w/kg,kj:J/1000};}
-function agg(list){const r={days:new Set(),sets:0,reps:0,ton:0,cmin:0,km:0,elev:0,kcal:0};list.forEach(e=>{r.days.add(e.date);if(e.kind==="reps"){r.sets+=e.sets;r.reps+=e.sets*e.reps;r.ton+=e.sets*e.reps*(e.kg||0);}else if(e.kind==="time"){r.sets+=e.sets;}else{r.cmin+=e.min||0;const ef=e.kcal!=null?{kcal:e.kcal}:esfuerzo(e);if(ef)r.kcal+=ef.kcal;if(e.exId.startsWith("bici")){r.km+=e.km||0;r.elev+=e.elev||0;}}});return r;}
-function describe(e){if(e.kind==="reps")return e.sets+"×"+e.reps+(e.kg?" · "+fmt(e.kg,e.kg%1?1:0)+" kg":"")+(e.side&&e.side!=="Ambos"?" · "+e.side:"");if(e.kind==="time")return e.sets+"×"+e.secs+" s";let s=fmt(e.min)+" min";if(e.km)s+=" · "+fmt(e.km,e.km%1?1:0)+" km";if(e.elev)s+=" · +"+fmt(e.elev)+" m";if(e.km&&e.min)s+=" · "+fmt(e.km/(e.min/60),1)+" km/h";const ef=esfuerzo(e);const dev=e.kcalDev!=null||e.wDev!=null;if(ef||dev){const k=e.kcalDev??e.kcal??(ef&&ef.kcal);const w=e.wDev??e.watts??(ef&&ef.w);if(k!=null)s+=" · "+(e.kcalDev!=null?"":"≈")+fmt(k)+" kcal";if(w)s+=" · "+(e.wDev!=null?"":"≈")+fmt(w)+" W";}return s;}
+/* Fuerza: ~2,5 min por serie (trabajo + descanso) a 3,5 MET. Pasos: zancada 0,415 × talla, 0,75 kcal por kg y km */
+function minFuerza(e){return e.kind==="reps"?(e.sets||0)*2.5:e.kind==="time"?(e.sets||0)*((e.secs||0)/60+1.5):0;}
+function kcalFuerza(e){const m=minFuerza(e);return m?3.5*pesoEn(e.date)*m/60:0;}
+function kcalPasos(pasos,f){const t=S.parametros.talla||170;return pasos*0.415*t/100/1000*pesoEn(f||today())*0.75;}
+function agg(list){const r={days:new Set(),sets:0,reps:0,ton:0,cmin:0,km:0,elev:0,kcal:0,kcalF:0,kcalB:0};list.forEach(e=>{r.days.add(e.date);if(e.kind==="reps"||e.kind==="time")r.kcalF+=kcalFuerza(e);if(e.kind==="reps"){r.sets+=e.sets;r.reps+=e.sets*e.reps;r.ton+=e.sets*e.reps*(e.kg||0);}else if(e.kind==="time"){r.sets+=e.sets;}else{r.cmin+=e.min||0;const ef=e.kcal!=null?{kcal:e.kcal}:esfuerzo(e);if(ef){r.kcal+=ef.kcal;if(e.kind==="bike"||e.exId.startsWith("bici"))r.kcalB+=ef.kcal;}if(e.exId.startsWith("bici")){r.km+=e.km||0;r.elev+=e.elev||0;}}});return r;}
+function describe(e){if(e.kind==="reps")return e.sets+"×"+e.reps+(e.kg?" · "+fmt(e.kg,e.kg%1?1:0)+" kg":"")+(e.side&&e.side!=="Ambos"?" · "+e.side:"")+" · ≈"+fmt(kcalFuerza(e))+" kcal";if(e.kind==="time")return e.sets+"×"+e.secs+" s · ≈"+fmt(kcalFuerza(e))+" kcal";let s=fmt(e.min)+" min";if(e.km)s+=" · "+fmt(e.km,e.km%1?1:0)+" km";if(e.elev)s+=" · +"+fmt(e.elev)+" m";if(e.km&&e.min)s+=" · "+fmt(e.km/(e.min/60),1)+" km/h";const ef=esfuerzo(e);const dev=e.kcalDev!=null||e.wDev!=null;if(ef||dev){const k=e.kcalDev??e.kcal??(ef&&ef.kcal);const w=e.wDev??e.watts??(ef&&ef.w);if(k!=null)s+=" · "+(e.kcalDev!=null?"":"≈")+fmt(k)+" kcal";if(w)s+=" · "+(e.wDev!=null?"":"≈")+fmt(w)+" W";}return s;}
 
+/* ================= PLAN Y METAS ================= */
+function planDefaults(){const lc=latest(S.medidas,"cintura"),lp=latest(S.balanza,"peso")||latest(S.medidas,"peso");
+  const R_=typeof bikeRides==="function"?bikeRides():[];const cut=iso(new Date(Date.now()-28*864e5));const rec=R_.filter(r=>r.date>=cut&&r._w!=null);
+  const wm=rec.length?Math.round(rec.reduce((a,r)=>a+r._w,0)/rec.length):null;const p20=Math.max(0,...R_.filter(r=>r.date>=iso(new Date(Date.now()-90*864e5))&&r.p20m).map(r=>r.p20m))||null;
+  return {inicio:weekStart(today()),semanas:12,cinturaIni:lc?lc.cintura:null,cinturaMeta:lc?Math.round((lc.cintura-3.5)*2)/2:null,pesoIni:lp?lp.peso:null,pesoMeta:lp?Math.round((lp.peso*0.945)*2)/2:null,
+    wIni:wm,wMeta:wm?wm+6:null,p20Ini:p20,p20Meta:p20?p20+7:null,rouvySem:3,rutaSem:1,fuerzaSem:3,kcalBiciSem:1100,pasosDia:6000};}
+function planWeeks(P_){const out=[];let d=pD(P_.inicio);for(let i=0;i<P_.semanas;i++){out.push(iso(d));d.setDate(d.getDate()+7);}return out;}
+function semanaPlan(w){const P_=S.plan,list=S.entrenos.filter(e=>weekStart(e.date)===w);const a=agg(list);
+  const rouvy=list.filter(e=>e.exId==="bici-est"&&(e.min||0)>=20).length,ruta=list.filter(e=>e.exId==="bici-ruta"&&(e.min||0)>=20).length;
+  const fz=new Set(list.filter(e=>e.kind==="reps"||e.kind==="time").map(e=>e.date)).size;
+  const t=today(),end=iso(new Date(pD(w).getTime()+6*864e5));const dias=w>t?0:(end<=t?7:Math.round((pD(t)-pD(w))/864e5)+1);
+  const kP=kcalPasos(P_.pasosDia||0,w)*dias;return {rouvy,ruta,fz,kB:a.kcalB,kF:a.kcalF,kP,dias,tot:a.kcalB+a.kcalF+kP};}
+function bar(frac,ok){const f=Math.max(0,Math.min(1,frac||0));return `<div style="height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin:4px 0 2px"><div style="height:100%;width:${Math.round(f*100)}%;background:${ok?"var(--ok)":"var(--warn)"}"></div></div>`;}
+function planHTML(){const P_=S.plan;
+  if(!P_)return `<div class="panel"><h2>Plan y metas</h2><p class="hint">Cree un plan de 12 semanas con metas de cintura, peso, potencia en bici y sesiones por semana. La app sigue su avance con lo que ya registra.</p><div class="row"><button class="btn" id="pl-new">Crear plan</button></div></div>`;
+  const ws=planWeeks(P_),t=today(),wi=ws.indexOf(weekStart(t)),n=ws.length,fin=iso(new Date(pD(ws[n-1]).getTime()+6*864e5));
+  const prog=t<P_.inicio?0:Math.min(1,((pD(t)-pD(P_.inicio))/864e5+1)/(n*7));
+  const sw=semanaPlan(weekStart(t));const kGoal=(P_.kcalBiciSem||0)+(P_.fuerzaSem||0)*kcalFuerza({kind:"reps",sets:18,date:t})+kcalPasos(P_.pasosDia||0)*7;
+  const chip=(l,v,g)=>`<span class="chip" aria-pressed="${v>=g}" style="cursor:default">${v>=g?"✓ ":""}${l} ${v}/${g}</span>`;
+  // metas
+  const lc=latest(S.medidas,"cintura"),lpB=latest(S.balanza,"peso"),lpM=latest(S.medidas,"peso");const lp=lpB&&(!lpM||lpB.fecha>=lpM.fecha)?lpB:lpM;
+  const R_=bikeRides(),c28=iso(new Date(Date.now()-28*864e5)),rec=R_.filter(r=>r.date>=c28&&r._w!=null);
+  const wNow=rec.length?rec.reduce((a,r)=>a+r._w,0)/rec.length:null,p20Now=R_.filter(r=>r.date>=c28&&r.p20m).reduce((a,r)=>Math.max(a,r.p20m),0)||null;
+  const last4=ws.slice(Math.max(0,wi-3),wi+1).filter(w=>w<=weekStart(t));const kb4=last4.length?last4.reduce((a,w)=>a+semanaPlan(w).kB,0)/last4.length:null;
+  const M_=[["Cintura",P_.cinturaIni,P_.cinturaMeta,lc&&lc.fecha>=P_.inicio?lc.cintura:(lc?lc.cintura:null),"cm",1,lc?fD(lc.fecha):""],
+    ["Peso",P_.pesoIni,P_.pesoMeta,lp?lp.peso:null,"kg",1,lp?fD(lp.fecha):""],
+    ["W medios Rouvy (28 días)",P_.wIni,P_.wMeta,wNow,"W",0,rec.length+" sesiones"],
+    ["Mejor 20 min (28 días)",P_.p20Ini,P_.p20Meta,p20Now,"W",0,""],
+    ["Kcal de bici por semana (prom. 4 sem.)",P_.wIni!=null?0:0,P_.kcalBiciSem,kb4,"kcal",0,""]].filter(x=>x[2]!=null);
+  const rows=M_.map(([l,ini,meta,act,u,dec,sub])=>{if(l.startsWith("Kcal de bici"))ini=0;const fr=act==null||ini==null||meta===ini?0:(act-ini)/(meta-ini);
+    const esperado=l.startsWith("Kcal de bici")?meta:(ini==null?null:ini+(meta-ini)*prog);const enCamino=act!=null&&esperado!=null&&((meta<ini&&act<=esperado+0.0001)||(meta>=ini&&act>=esperado-0.0001));
+    return `<div style="margin:10px 0"><div class="row between"><b>${l}</b><span>${act!=null?fmt(act,dec)+" "+u:"—"} <span class="hint">→ meta ${fmt(meta,dec)} ${u}</span></span></div>${bar(fr,enCamino)}<div class="hint">${ini!=null&&!l.startsWith("Kcal")?"inicio "+fmt(ini,dec)+" · ":""}${esperado!=null&&!l.startsWith("Kcal de bici")?"esperado a hoy "+fmt(esperado,dec)+" "+u+" · ":""}${act==null?"sin datos":(enCamino?"en camino":"atrasado")}${sub?" · "+esc(sub):""}</div></div>`;}).join("");
+  const hist=ws.filter(w=>w<=weekStart(t)).slice().reverse().map(w=>{const s_=semanaPlan(w);return `<tr><td>${pD(w).toLocaleDateString("es-BO",{day:"2-digit",month:"short"})}</td><td>${s_.rouvy}</td><td>${s_.ruta}</td><td>${s_.fz}</td><td>${fmt(s_.kB)}</td><td>${fmt(s_.kF)}</td><td>${fmt(s_.kP)}</td><td><b>${fmt(s_.tot)}</b></td></tr>`;}).join("");
+  return `<div class="panel" id="plan"><div class="row between"><h2>Plan · ${wi>=0?"semana "+(wi+1)+" de "+n:(t<P_.inicio?"empieza el "+fD(P_.inicio):"terminado")}</h2><button class="btn ghost sm" id="pl-edit">Editar plan</button></div>
+  <div class="hint">${fD(P_.inicio)} → ${fD(fin)}</div>
+  <h3 style="margin:12px 0 4px;font-size:15px">Esta semana</h3><div class="chips">${chip("Rouvy",sw.rouvy,P_.rouvySem)}${chip("Ruta",sw.ruta,P_.rutaSem)}${chip("Fuerza",sw.fz,P_.fuerzaSem)}</div>
+  <div style="margin-top:10px"><div class="row between"><b>Kcal de ejercicio</b><span>${fmt(sw.tot)} <span class="hint">/ ${fmt(kGoal)} semana</span></span></div>${bar(sw.tot/kGoal,sw.tot>=kGoal*sw.dias/7)}
+  <div class="hint">bici ${fmt(sw.kB)} · fuerza ≈${fmt(sw.kF)} · pasos ≈${fmt(sw.kP)} (${fmt(P_.pasosDia)} por día × ${sw.dias} días)</div></div>
+  <h3 style="margin:14px 0 0;font-size:15px">Metas</h3>${rows}
+  <h3 style="margin:14px 0 4px;font-size:15px">Semanas del plan</h3><div class="tbl"><table><thead><tr><th>Semana</th><th>Rouvy</th><th>Ruta</th><th>Fuerza (días)</th><th>Kcal bici</th><th>Kcal fuerza</th><th>Kcal pasos</th><th>Total</th></tr></thead><tbody>${hist||`<tr><td colspan="8" class="empty">El plan aún no empieza.</td></tr>`}</tbody></table></div>
+  <p class="hint">Kcal de fuerza y pasos son estimadas (fuerza: ~2,5 min por serie a 3,5 MET; pasos: zancada según talla). Los paseos con los perros ya están en los pasos: no los registre además como caminata. Los pasos son actividad de base; lo que suma déficit nuevo es la bici y la fuerza.</p></div>`;}
+function planForm(m){const P_=Object.assign(planDefaults(),S.plan||{});
+  const F_=[["inicio","Inicio (lunes)","date"],["semanas","Semanas"],["cinturaIni","Cintura inicial (cm)"],["cinturaMeta","Meta de cintura (cm)"],["pesoIni","Peso inicial (kg)"],["pesoMeta","Meta de peso (kg)"],["wIni","W medios Rouvy al inicio"],["wMeta","Meta de W medios"],["p20Ini","Mejor 20 min al inicio (W)"],["p20Meta","Meta de mejor 20 min (W)"],["rouvySem","Sesiones de Rouvy por semana"],["rutaSem","Salidas en ruta por semana"],["fuerzaSem","Días de fuerza por semana"],["kcalBiciSem","Meta de kcal de bici por semana"],["pasosDia","Pasos promedio por día"]];
+  m.innerHTML=`<div class="panel"><h2>${S.plan?"Editar plan":"Crear plan"}</h2><p class="hint">Valores sugeridos a partir de sus datos actuales. Las metas de cintura, peso y potencia son opcionales: deje en blanco las que no quiera seguir.</p>
+  <div class="fields">${F_.map(([k,l,ty])=>`<div class="field"><label class="lbl" for="pl-${k}">${l}</label><input id="pl-${k}" ${ty==="date"?'type="date"':'inputmode="decimal"'} value="${P_[k]??""}"></div>`).join("")}</div>
+  <div class="row"><button class="btn" id="pl-save">Guardar plan</button><button class="btn ghost" id="pl-cancel">Cancelar</button>${S.plan?'<button class="btn warn sm" id="pl-del">Borrar plan</button>':""}</div></div>`;
+  $("pl-save").onclick=()=>{const o={};F_.forEach(([k,,ty])=>{const v=$("pl-"+k).value;o[k]=ty==="date"?(v?weekStart(v):weekStart(today())):(v===""?null:num(v));});o.semanas=Math.max(1,Math.round(o.semanas||12));["rouvySem","rutaSem","fuerzaSem","kcalBiciSem","pasosDia"].forEach(k=>{if(o[k]==null)o[k]=0;});S.plan=o;save();toast("Plan guardado");go("inicio");};
+  $("pl-cancel").onclick=()=>go("inicio");
+  if($("pl-del")){const d=$("pl-del");d.onclick=()=>{if(d.dataset.armed){delete S.plan;save();toast("Plan borrado");go("inicio");}else{d.dataset.armed="1";d.textContent="Toque de nuevo para borrar";}};}}
 /* ================= INDICADORES ================= */
 function spark(pts,color,ref){if(pts.length<2)return "";const p=pts.slice().sort((a,b)=>a.x.localeCompare(b.x));const W=150,H=34;const xs=p.map(q=>pD(q.x).getTime());const x0=Math.min(...xs),x1=Math.max(...xs)||x0+1;let y0=Math.min(...p.map(q=>q.y)),y1=Math.max(...p.map(q=>q.y));if(ref!=null&&ref>=y0-(y1-y0)&&ref<=y1+(y1-y0)){y0=Math.min(y0,ref);y1=Math.max(y1,ref);}if(y1===y0){y1+=1;y0-=1;}
   const X=t=>2+(W-4)*(t-x0)/((x1-x0)||1),Y=v=>3+(H-6)*(1-(v-y0)/(y1-y0));let s=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">`;
@@ -274,9 +327,9 @@ function vInicio(m){
     ["Cintura / talla",whtr?fmt(whtr,3):"—","meta < 0,500",whtr>0.5],
     ["% grasa (cinta, Navy)",bf?fmt(bf,1)+" %":"—",bf?"con cuello "+(lmN&&lmN.cuello?"medido":"de referencia"):(P.sexo==="F"?"mida cintura, cuello y cadera":"mida cintura y cuello"),false],
     ["% grasa (balanza"+(P.correccionBalanza?", corregida":"")+")",bfB?fmt(bfB,1)+" %":"—",lb?fD(lb.fecha):"",false],
-    ["Esta semana",wk.sets+" series",fmt(wk.cmin)+" min cardio · "+fmt(wk.kcal)+" kcal · "+fmt(wk.km,1)+" km bici",false],
+    ["Esta semana",wk.sets+" series",fmt(wk.cmin)+" min cardio · "+fmt(wk.kcal+wk.kcalF)+" kcal ejercicio · "+fmt(wk.km,1)+" km bici",false],
     ["Último análisis",ll?fD(ll.fecha):"—",labMonths!=null?"hace "+labMonths+" meses":"",labMonths>12]];
-  let h=`<div class="panel"><h2>Hoy</h2><div class="stats">${cards.map(c=>`<div class="stat${c[3]?" alert":""}"><span>${c[0]}</span><b>${c[1]}</b><span>${esc(c[2])}</span></div>`).join("")}</div></div>`;
+  let h=`<div class="panel"><h2>Hoy</h2><div class="stats">${cards.map(c=>`<div class="stat${c[3]?" alert":""}"><span>${c[0]}</span><b>${c[1]}</b><span>${esc(c[2])}</span></div>`).join("")}</div></div>`+planHTML();
   // tendencia grasa balanza
   const bpts=S.balanza.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*corrB(r)/100}));
   const ffm=S.balanza.filter(r=>r.grasa!=null).map(r=>({x:r.fecha,y:r.peso*(1-corrB(r)/100)}));
@@ -290,6 +343,7 @@ function vInicio(m){
   if(msgs.length)h+=`<div class="panel"><h2>Para tener en cuenta</h2>${msgs.map(t=>`<div class="note${t.startsWith("Hace")?" w":""}">${esc(t)}</div>`).join("")}</div>`;
   h+=`<div class="panel"><h2>Peso y cintura</h2><div class="chart" id="ch1"></div></div>`;
   m.innerHTML=h;
+  if($("pl-new"))$("pl-new").onclick=()=>planForm(m);if($("pl-edit"))$("pl-edit").onclick=()=>planForm(m);
   const c=C();
   const pw=S.medidas.filter(r=>r.peso).map(r=>({x:r.fecha,y:r.peso})).concat(S.balanza.map(r=>({x:r.fecha,y:r.peso})));
   $("ch1").innerHTML=lineChart([{name:"Peso (kg)",color:c.a,pts:pw},{name:"Cintura (cm)",color:c.w,pts:S.medidas.filter(r=>r.cintura).map(r=>({x:r.fecha,y:r.cintura}))}],{label:"Peso y cintura"});
@@ -375,7 +429,7 @@ function drawWeeks(){const ws=[];let d=pD(weekStart(today()));for(let i=0;i<12;i
   let s=`<svg viewBox="0 0 ${W} ${H}">`;[0,.5,1].forEach(f=>{const y=T+(H-T-B)*(1-f);s+=`<line x1="${L}" x2="${W-8}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-4}" y="${y+4}" text-anchor="end">${Math.round(mx*f)}</text>`;});
   A.forEach((a,i)=>{const h=(H-T-B)*a.sets/mx,x=L+i*bw+bw*.2;s+=`<rect x="${x}" y="${H-B-h}" width="${bw*.6}" height="${h}" rx="3" fill="${c.a}" opacity="${i===11?1:.6}"/>`;if(a.sets)s+=`<text x="${x+bw*.3}" y="${H-B-h-4}" text-anchor="middle">${a.sets}</text>`;if(i%3===2)s+=`<text x="${x+bw*.3}" y="${H-7}" text-anchor="middle">${pD(ws[i]).toLocaleDateString("es-BO",{day:"2-digit",month:"short"})}</text>`;});
   $("ch-w").innerHTML=s+"</svg>";
-  $("t-w").innerHTML=`<thead><tr><th>Semana</th><th>Días</th><th>Series</th><th>Reps</th><th>Kg×reps</th><th>Cardio min</th><th>Kcal cardio</th><th>Bici km</th><th>Desnivel</th></tr></thead><tbody>${ws.map((w,i)=>[w,A[i]]).reverse().slice(0,6).map(([w,a])=>`<tr><td>${pD(w).toLocaleDateString("es-BO",{day:"2-digit",month:"short"})}</td><td>${a.days.size}</td><td>${a.sets}</td><td>${fmt(a.reps)}</td><td>${fmt(a.ton)}</td><td>${fmt(a.cmin)}</td><td>${fmt(a.kcal)}</td><td>${fmt(a.km,1)}</td><td>${fmt(a.elev)}</td></tr>`).join("")}</tbody>`;}
+  $("t-w").innerHTML=`<thead><tr><th>Semana</th><th>Días</th><th>Series</th><th>Reps</th><th>Kg×reps</th><th>Cardio min</th><th>Kcal cardio</th><th>Kcal fuerza</th><th>Bici km</th><th>Desnivel</th></tr></thead><tbody>${ws.map((w,i)=>[w,A[i]]).reverse().slice(0,6).map(([w,a])=>`<tr><td>${pD(w).toLocaleDateString("es-BO",{day:"2-digit",month:"short"})}</td><td>${a.days.size}</td><td>${a.sets}</td><td>${fmt(a.reps)}</td><td>${fmt(a.ton)}</td><td>${fmt(a.cmin)}</td><td>${fmt(a.kcal)}</td><td>${fmt(a.kcalF)}</td><td>${fmt(a.km,1)}</td><td>${fmt(a.elev)}</td></tr>`).join("")}</tbody>`;}
 function drawProg(){const ids=[...new Set(S.entrenos.map(e=>e.exId))];const t=$("t-p");if(!ids.length){t.innerHTML=`<tbody><tr><td class="empty">Su mejor marca por ejercicio aparecerá aquí.</td></tr></tbody>`;return;}
   const cut=new Date();cut.setDate(cut.getDate()-28);const cs=iso(cut);
   t.innerHTML=`<thead><tr><th>Ejercicio</th><th>Última</th><th>Fecha</th><th>Mejor</th><th>Series 4 sem</th></tr></thead><tbody>${ids.map(id=>{const L=S.entrenos.filter(e=>e.exId===id).sort((a,b)=>(b.date+b.ts).localeCompare(a.date+a.ts));const l=L[0];let best;
@@ -618,7 +672,7 @@ $("fit-in").addEventListener("change",async ev=>{const fs=[...ev.target.files];e
 let importMode="replace";
 function mergeData(d){const keys={medidas:r=>r.fecha,balanza:r=>r.fecha+"|"+(r.hora||"")+"|"+r.peso,laboratorio:r=>r.fecha,eventos:r=>r.fecha+"|"+r.texto,entrenos:r=>r.id,ejerciciosPropios:r=>r.id};let n=0;
   Object.entries(keys).forEach(([k,fn])=>{const have=new Set((S[k]||[]).map(fn));(d[k]||[]).forEach(r=>{if(!have.has(fn(r))){S[k].push(r);have.add(fn(r));n++;}});});
-  if(!S.pendientes&&d.pendientes)S.pendientes=d.pendientes;const P=S.parametros,Q=(d.parametros||{});["talla","sexo","nacimiento","altitud","cuelloRef","nombre"].forEach(k=>{if(!P[k]&&Q[k])P[k]=Q[k];});return n;}
+  if(!S.pendientes&&d.pendientes)S.pendientes=d.pendientes;if(!S.plan&&d.plan)S.plan=d.plan;const P=S.parametros,Q=(d.parametros||{});["talla","sexo","nacimiento","altitud","cuelloRef","nombre"].forEach(k=>{if(!P[k]&&Q[k])P[k]=Q[k];});return n;}
 $("file-in").addEventListener("change",ev=>{const f=ev.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d||!Array.isArray(d.medidas)||!Array.isArray(d.balanza))throw 0;
   if(importMode==="merge"){const n=mergeData(migrate(d));importMode="replace";save();toast(n?"Agregados "+n+" registros nuevos":"No había registros nuevos en el archivo");go(view);ev.target.value="";return;}
   S=migrate(d);delete S.exportado;save();toast("Respaldo cargado: "+S.medidas.length+" mediciones, "+S.balanza.length+" pesadas, "+S.laboratorio.length+" análisis");go("inicio");}catch(e){toast("Ese archivo no es un respaldo válido de esta app");}ev.target.value="";};rd.readAsText(f);});
